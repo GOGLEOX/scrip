@@ -16,6 +16,16 @@ Optional-client design: no custom channels or payloads yet; Forge's display test
 
 CI builds both jars and runs checks on Java 21. The local bounded smoke runner observes both Minecraft and Scrip readiness, optionally probes a client connection twice, requests shutdown, and requires exit code zero. It writes only sanitized evidence. No CI run is implied by checking in the workflow.
 
+## Implemented in P01
+
+`common` now owns the loader-neutral `LedgerStore` persistence boundary. `JournalFileLedgerStore` stores opaque immutable `JournalOperation` records, so future account logic can define its own payload schema without writing around the durability layer. Each record has a format version, monotonic sequence, UUID operation ID, bounded payload, byte length, and CRC-32 checksum.
+
+All commits are serialized through one bounded, daemon writer. The writer appends a complete frame with Java NIO `FileChannel`, calls `force(true)`, and only then returns `CommitReceipt`. A write that begins and then fails places the instance in recovery-required state; it cannot acknowledge the operation or accept further writes. The next process may recover the durable record if it exists, but P02 must use operation IDs to reconcile that ambiguous caller outcome safely.
+
+Recovery validates a checkpoint manifest and its versioned snapshot before replaying only journal entries after the snapshot sequence. A short final frame is truncated and forced as a torn tail. A bad checksum, invalid length, non-monotonic sequence, duplicate operation ID, invalid manifest, or mismatched snapshot fails closed. No state is initialized from corrupt storage.
+
+Checkpoints write and force a new versioned snapshot file, validate it, then replace a forced and verified manifest. The preceding checkpoint file stays on disk as a recovery anchor. P01 does not delete or compact journal entries; P10 owns segment retirement after a verified recovery process.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

@@ -49,3 +49,12 @@
 - Local test-server EULA acceptance was explicitly authorized. Offline smoke servers bind only to loopback and use ignored fixture worlds. No public hosting or release is authorized.
 - Project metadata follows the linked repository's existing MIT license and identifies it as MIT in both loader descriptors.
 - No persisted format, journal schema or save migration is introduced in P00. Do not begin P01 until the P00 gate is resolved and the user authorizes further work.
+
+## P01 persistence decisions | 2026-11-13
+
+- `LedgerStore` is now the only persistence boundary for future monetary operations. Its P01 operations use opaque immutable payloads because account, claim, fee, and settlement schemas are not authorized until later packets.
+- Journal format version 1 uses a length-prefixed frame containing a magic value, format version, positive sequence, UUID operation ID, UTF-8 operation type, bounded payload, and CRC-32 checksum. Replaying duplicate operation IDs, non-increasing sequences, invalid sizes, and invalid checksums fails closed.
+- Journal writes use a single bounded writer and `FileChannel.force(true)`. A commit receipt is completed only after force succeeds. A failure after a write begins marks the running instance recovery-required, preventing further acknowledgements until a restart/recovery pass.
+- Snapshot format version 1 and a checksummed checkpoint manifest are written through forced temporary files and published with atomic move where available, falling back to replacement move only when the platform cannot provide atomic move. Snapshot filenames carry their checkpoint sequence, so a previous verified snapshot remains available while a later checkpoint is prepared.
+- A torn final journal frame is quarantined by truncating only that incomplete tail and forcing the repaired file. Corruption in a complete record, snapshot, or manifest is an operator-visible storage failure; no empty ledger is created.
+- P01 adds no account, balance, claim, command, configuration, cleanup, or journal-deletion behavior. P10 remains responsible for backup, compaction and retention. P02 owns account operation payloads and transaction semantics.
