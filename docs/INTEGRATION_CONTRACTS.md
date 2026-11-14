@@ -1,4 +1,4 @@
-# $crip | Integration Contracts (Design Only)
+# $crip | Integration Contracts
 
 **Scope:** Minecraft 1.21.1, Java 21, Forge+NeoForge runtime core.
 
@@ -32,9 +32,9 @@ The restricted command bridge is `/scrip integration reward <source> <claim-id> 
 ## 3. Serilum Starter Kit integration
 Source: https://www.curseforge.com/minecraft/mc-mods/starter-kit/files/9259631 .
 - Serilum 1.21.1-9.0 universal jar tagged Forge + NeoForge, requires Collective when Serilum installed.
-- Integration profile: server executes secure $crip starter grant only after kit issue, with test of command context.
-- Chosen `FIRST_JOIN` vs `STARTER_KIT` mode; lack of target or misconfiguration creates warning, NOT silent fallback.
-- Tests: first join, existing player, multiple kits, duplicate command, relog, renamed player, server crash after grant, both loaders, Serilum/Collective absent.
+- P07-B uses Starter Kit's documented per-kit command file. Its verified source path creates a server command source at the recipient entity; the configuration line uses `@s`, never an unverified display-name substitution, and $crip verifies that source entity matches the resolved target.
+- Canonical claim key is `starter_grant:<player-uuid>`, calculated by $crip. `FIRST_JOIN` and `STARTER_KIT` are mutually exclusive durable configuration modes; no fallback occurs when Starter Kit or Collective is absent.
+- Exact configuration and evidence limitations are maintained in `docs/INTEGRATIONS.md`. No native Serilum event dependency is taken.
 
 ## 4. FTB Quests integration
 Docs: https://docs.feed-the-beast.com/mod-docs/1.21.1/mods/suite/Quests/Developer/Quests/Rewards/Command_Reward/ .

@@ -29,9 +29,12 @@ public final class CommandService {
     private final RewardService rewards;
     private final TrustedRewardSourceRegistry trustedRewardSources;
     private final DefaultEconomyService economy;
+    private volatile boolean starterKitCompatible;
 
     public CommandService(AccountLedger ledger) { this.ledger = ledger; this.payments=new PaymentService(ledger); this.rewards=new RewardService(ledger); this.trustedRewardSources=new TrustedRewardSourceRegistry();this.trustedRewardSources.register(new TrustedRewardSource("command",100_000,true));this.economy=new DefaultEconomyService(ledger,trustedRewardSources,ignored->false); }
     public void playerJoined(UUID playerId) { rewards.starterGrant(playerId, StarterGrantMode.FIRST_JOIN); }
+    /** Loader adapters set this from their own optional-mod discovery; the common module has no Serilum dependency. */
+    public void setStarterKitCompatible(boolean compatible) { starterKitCompatible=compatible; }
     public Optional<AccountSnapshot> balance(UUID playerId) { return ledger.findPersonal(playerId); }
     public Optional<AccountSnapshot> balanceByVerifiedPlayer(UUID playerId) { return ledger.findPersonal(playerId); }
     public TransferOutcome pay(UUID senderId, UUID recipientId, long amount, UUID operationId) {
@@ -56,4 +59,10 @@ public final class CommandService {
     public JournalMaintenancePreview journalMaintenancePreview() { return ledger.journalMaintenancePreview(); }
     /** Command adapter has already authenticated an administrator; only allow registered command-enabled sources. */
     public IntegrationRewardResponse integrationReward(String source,String claimId,UUID recipient,long amount) { return trustedRewardSources.find(source).filter(TrustedRewardSource::commandAllowed).map(ignored->economy.issueReward(new IntegrationRewardRequest(source,claimId,recipient,amount)).toCompletableFuture().join()).orElseGet(()->new IntegrationRewardResponse(IntegrationRewardResponse.Status.UNAUTHORIZED_SOURCE,null,java.util.OptionalLong.empty())); }
+    /** Executes only from Starter Kit's server command source after its player entity was independently resolved. */
+    public IntegrationRewardResponse starterKitGrant(UUID commandPlayer, UUID recipient, String claimId, long configuredAmount) {
+        if(!starterKitCompatible || !commandPlayer.equals(recipient) || !"starter".equals(claimId)) return new IntegrationRewardResponse(IntegrationRewardResponse.Status.UNAUTHORIZED_SOURCE,null,java.util.OptionalLong.empty());
+        if(ledger.rewardConfiguration().starterGrant()!=configuredAmount) return new IntegrationRewardResponse(IntegrationRewardResponse.Status.INVALID,null,java.util.OptionalLong.empty());
+        return switch(rewards.starterGrant(recipient,StarterGrantMode.STARTER_KIT)) { case ISSUED -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.ISSUED,null,java.util.OptionalLong.empty()); case DUPLICATE -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.DUPLICATE,null,java.util.OptionalLong.empty()); case DISABLED -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.INVALID,null,java.util.OptionalLong.empty()); case UNKNOWN_PLAYER -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.UNKNOWN_PLAYER,null,java.util.OptionalLong.empty()); default -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.STORAGE_FAILURE,null,java.util.OptionalLong.empty()); };
+    }
 }

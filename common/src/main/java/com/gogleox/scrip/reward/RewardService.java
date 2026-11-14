@@ -37,7 +37,7 @@ public final class RewardService {
     public RewardResult starterGrant(UUID player, StarterGrantMode trigger) {
         RewardConfiguration configuration = ledger.rewardConfiguration();
         if (configuration.starterGrantMode() != trigger || configuration.starterGrant() == 0) return RewardResult.DISABLED;
-        return issue(player, RewardSource.STARTER_GRANT, configuration.starterGrant(), "starter:" + player);
+        return issue(player, RewardSource.STARTER_GRANT, configuration.starterGrant(), "starter_grant:" + player);
     }
     private RewardResult oneTime(UUID player, RewardSource source, String event) { return issue(player, source, ledger.rewardConfiguration().amountFor(source), source.name().toLowerCase(Locale.ROOT) + ":" + player + ":" + event); }
     private RewardResult repeatable(UUID player, RewardSource source, String event) { return issue(player, source, ledger.rewardConfiguration().amountFor(source), ""); }

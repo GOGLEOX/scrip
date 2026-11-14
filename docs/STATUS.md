@@ -6,10 +6,11 @@
 **P03-M authoritative update (2026-11-14):** P03-M administrative maintenance configuration and read-only inspection controls are complete and verified.
 **P05 authoritative update (2026-11-14):** P05 fees and server-authoritative payment confirmations are complete and verified.
 **P06 authoritative update (2026-11-14):** P06 gameplay reward and starter-grant foundation is complete and verified.
-**P07-A authoritative update (2026-11-14):** P07-A public economy API and integration bridge is complete and verified. Stop after P07-A.
-**Current:** P07-A PASS — public economy API and trusted integration bridge verified. Stop after P07-A.
+**P07-A authoritative update (2026-11-14):** P07-A public economy API and integration bridge is complete and verified.
+**P07-B authoritative update (2026-11-14):** P07-B optional Serilum Starter Kit command bridge is complete. Exact Starter Kit+Collective binary-pair testing remains a release-matrix blocker.
+**Current:** P07-B PASS with a documented binary-matrix blocker. Stop after P07-B.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
-**Next permitted packet:** A separately authorized P07 packet only.
+**Next permitted packet:** A separately authorized packet only.
 **Approved backend:** Durable in-memory snapshot + append-only forced journal (ADR-0001 ACCEPTED); SQLite not in v1.  
 **Approved maintenance scope:** Configurable automatic stale-account cleanup and admin preview/run/status/config, journal compact/verify (ADR-0002).  
 **Named integrations:** Serilum Starter Kit Forge+NeoForge, FTB Quests NeoForge 1.21.1, future first-party GOGLEOX shop hook both, ChunkLock objective and generic bridge.
@@ -108,3 +109,11 @@ The public version-1 `EconomyService` provides asynchronous immutable account, o
 The integration-consumer regression suite uses only the public API and covers transfer, frozen-account denial, organization authorization, unauthorized adjustments, durable duplicate/conflicting rewards, and restart replay. No shop, FTB, Serilum, ChunkLock, GUI, or further P07 work is included.
 
 Verification on Java 21: `:common:test` passed 44 tests with zero failures; `build verifyArtifacts` verified both P07-A loader artifacts; packaged Forge and NeoForge dedicated-server checks each reached readiness and passed the vanilla protocol reconnect probe without a client mod.
+
+## P07-B implementation record
+
+**P07-B verification: PASS with release-matrix blocker. Stop after P07-B.**
+
+P07-B implements an optional, command-on-kit bridge without compiling against Serilum. Both loaders detect the `starterkit` and `collective` pair; a missing pair rejects kit grants and leaves normal server operation unchanged. The only accepted kit path is the documented server command context with `@s` resolving to the recipient entity. It validates that context, the exact configured amount, `STARTER_KIT` mode, and a fixed marker before using the permanent `starter_grant:<UUID>` claim.
+
+Verification on Java 21: `:common:test` passed 45 tests with zero failures; `build verifyArtifacts` verified both P07-B loader artifacts; packaged Forge and NeoForge dedicated-server checks passed without Starter Kit or Collective and completed the vanilla reconnect probe. Common regression coverage verifies absent dependency rejection, recipient-context mismatch rejection, amount mismatch rejection, issue, duplicate reissue, restart replay, and canonical claim persistence. Source inspection verifies the Starter Kit command context; running the exact pinned Starter Kit+Collective artifacts on both loaders remains required before advertising binary compatibility.

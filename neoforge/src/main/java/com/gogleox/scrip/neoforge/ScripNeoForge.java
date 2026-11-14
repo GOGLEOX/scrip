@@ -13,6 +13,7 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.ModList;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
 import java.util.Optional;
@@ -34,10 +35,11 @@ public final class ScripNeoForge {
     private void serverStarting(ServerStartingEvent event) {
         ledger = AccountLedger.open(event.getServer().getWorldPath(LevelResource.ROOT).resolve("scrip"), CurrencyDefinition.defaultCurrency());
         commands = new CommandService(ledger);
+        commands.setStarterKitCompatible(ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
     }
 
     private void serverStarted(ServerStartedEvent event) {
-        LOGGER.info("Scrip P06 server ready (NeoForge); currency default: {}", Scrip.DEFAULT_CURRENCY);
+        LOGGER.info("Scrip P07-B server ready (NeoForge); currency default: {}; Starter Kit compatible: {}", Scrip.DEFAULT_CURRENCY, ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
     }
 
     private void serverStopping(ServerStoppingEvent event) {

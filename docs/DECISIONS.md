@@ -109,3 +109,9 @@
 - `EconomyService` version 1 is the sole public integration boundary. It is Java 21 and loader-neutral, immutable at its inputs/outputs, asynchronous at its public operations, and contains no mutable ledger/storage exposure.
 - Trusted reward source IDs are explicitly registered by server-owned bootstrap code and have a positive maximum issue amount. The command bridge is operator-restricted and can use only sources marked command-enabled.
 - Integration reward idempotency persists the entire request identity. Same source/claim/recipient/amount is a replay-safe duplicate; a reused source/claim with different recipient or amount is a conflict. Events are emitted only after the forced operation returns.
+
+## P07-B Serilum Starter Kit | 2026-11-14
+
+- The adapter is command-context integration only. Source inspection establishes that Starter Kit runs kit-file commands as the server with the recipient as `@s`; $crip relies on that entity context and independently verifies recipient equality.
+- The static command-file marker is never an identity or claim key. $crip derives the permanent `starter_grant:<UUID>` claim, and requires configured `STARTER_KIT` mode and exact configured amount. This prevents first-join plus kit double payment.
+- Starter Kit and Collective are optional discovery signals, not compile dependencies. The source-verified mechanism is not advertised as a fully verified binary matrix until the pinned target pair runs on both loaders.

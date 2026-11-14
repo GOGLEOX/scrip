@@ -13,6 +13,7 @@ import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.ModList;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
 import java.util.Optional;
@@ -34,10 +35,11 @@ public final class ScripForge {
     private void serverStarting(ServerStartingEvent event) {
         ledger = AccountLedger.open(event.getServer().getWorldPath(LevelResource.ROOT).resolve("scrip"), CurrencyDefinition.defaultCurrency());
         commands = new CommandService(ledger);
+        commands.setStarterKitCompatible(ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
     }
 
     private void serverStarted(ServerStartedEvent event) {
-        LOGGER.info("Scrip P06 server ready (Forge); currency default: {}", Scrip.DEFAULT_CURRENCY);
+        LOGGER.info("Scrip P07-B server ready (Forge); currency default: {}; Starter Kit compatible: {}", Scrip.DEFAULT_CURRENCY, ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
     }
 
     private void serverStopping(ServerStoppingEvent event) {

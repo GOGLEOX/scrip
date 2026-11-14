@@ -4,7 +4,7 @@
 
 | Target | Forge 1.21.1 file | NeoForge 1.21.1 file | Planned integration type | $crip tested? | Notes |
 |---|---|---|---|---|---|
-| Serilum Starter Kit 1.21.1-9.0 | Research: yes (universal jar) | Research: yes (same universal jar) | Trusted starter grant command with one-time claim | **NO** | Serilum requires Collective; optional to $crip |
+| Serilum Starter Kit 1.21.1-9.0 | Source-verified optional command bridge | Source-verified optional command bridge | Trusted starter grant command with one-time claim | **PARTIAL** | $crip Forge/Neo builds and absent-dependency smoke checks pass; exact Starter Kit+Collective binary pair remains a release-matrix test |
 | FTB Quests 1.21.1 | Research: NOT verified / appears absent | Research: yes | Command Reward bridge; native only if justified | **NO** | Do not advertise FTB integration on Forge 1.21.1 |
 | Future GOGLEOX shop | Not developed | Not developed | First-party shop settlement API + sample consumer | **NO** | Not a released mod; no actual shop feature in $crip |
 | ChunkLock | Unknown (pin target) | Unknown (pin target) | Generic Economy API and tax-hook contract | **NO** | Needs ChunkLock-side version/hook agreement |

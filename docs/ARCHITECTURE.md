@@ -80,6 +80,12 @@ The public API is `EconomyService` version 1 in the loader-neutral common module
 
 Trusted integration rewards have a separate durable idempotency tuple rather than a best-effort claim marker. Source, claim ID, recipient, amount, operation ID, and durable sequence replay together. Post-commit listeners run only after the operation is durable. The administrative command bridge has no client path and accepts only registered command-enabled sources with bounded issue limits. No third-party integration API is loaded or called.
 
+## Implemented in P07-B
+
+P07-B keeps Starter Kit optional and dependency-free. Loader adapters check for both `starterkit` and `collective`; only then may the command bridge accept the `serilum-starter-kit` source. The bridge requires Starter Kit's server command entity to be the same verified recipient resolved from `@s`, requires the fixed `starter` marker and configured amount, and derives the permanent `starter_grant:<UUID>` key internally. This shares the existing P06 atomic issuance and claim boundary with first-join grants.
+
+No Serilum class is linked or loaded, no native event is subscribed, and an absent or incomplete Serilum installation cannot change $crip behavior. The supported integration surface is the documented kit command-file execution context only.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

@@ -30,6 +30,7 @@ class RewardServiceTest {
         }
         try(AccountLedger replayed=AccountLedger.open(directory,CurrencyDefinition.defaultCurrency())) {
             assertTrue(replayed.hasPermanentClaim("advancement:"+PLAYER+":advancement:minecraft:story/root"));
+            assertTrue(replayed.hasPermanentClaim("starter_grant:"+PLAYER));
             assertEquals(44,replayed.findPersonal(PLAYER).orElseThrow().balance().units());
             assertEquals(RewardResult.DUPLICATE,new RewardService(replayed).starterGrant(PLAYER,StarterGrantMode.FIRST_JOIN));
         }

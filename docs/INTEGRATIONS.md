@@ -1,12 +1,20 @@
 # $crip | Supported Integration Plans
 
-This file lists concrete sources selected for planning and desired user-facing behavior. **No integration has been implemented or tested.**
+This file lists concrete sources selected for planning and desired user-facing behavior. P07-B implements the Starter Kit command bridge; other entries remain planned unless explicitly marked otherwise.
 
 ## Priority 1: Serilum Starter Kit
 - Official: https://www.curseforge.com/minecraft/mc-mods/starter-kit ; exact 1.21.1 release: https://www.curseforge.com/minecraft/mc-mods/starter-kit/files/9259631 ; repository: https://github.com/Serilum/Starter-Kit .
 - Universal `starterkit-1.21.1-9.0.jar` tagged Forge/NeoForge. Serilum itself requires Collective, but $crip must not.
-- Template uses server-authorized command-on-kit issuing the configured initial Coins grant, with permanent UUID claim marker shared with first join.
-- Documentation must include server config modes, real verified command syntax, upgrade/absent-mod behavior, and instructions for disabling double-grant paths.
+- P07-B detects `starterkit` and `collective` independently through each loader's optional-mod registry. Their absence leaves $crip fully operational and prevents kit-triggered grants.
+- The verified command-file context is a server command source with the kit recipient as `@s`. In `config/serilum/starterkit/commands/<kit>.txt`, use this line without a leading slash, replacing `250` with the configured amount:
+
+  ```text
+  scrip integration reward serilum-starter-kit starter @s 250
+  ```
+
+  The amount must exactly equal $crip's durable starter-grant amount and its mode must be `STARTER_KIT`. The bridge rejects console/no-entity context, a command entity that differs from the resolved recipient, an unavailable Starter Kit/Collective pair, a non-`starter` marker, and a mismatched amount. It derives `starter_grant:<player-uuid>` itself; do not use `%s` for identity or try to supply a UUID claim.
+- Select exactly one $crip trigger mode. `FIRST_JOIN` pays only from $crip's verified join hook; `STARTER_KIT` pays only after the verified Starter Kit command. Both use the same permanent UUID claim, so reissue, retry, reconnect, restart, rename, reactivation, and future cleanup cannot pay twice.
+- Source inspection verifies this command context and the documented `@s`/`%s` behavior. P07-B intentionally has no native Starter Kit dependency or event subscription. A pinned binary pair run with the exact target Starter Kit and Collective artifacts remains a release-matrix requirement before advertising full runtime compatibility.
 
 ## Priority 1: FTB Quests
 - Project: https://www.curseforge.com/minecraft/mc-mods/ftb-quests-forge ; source: https://github.com/FTBTeam/FTB-Quests .
