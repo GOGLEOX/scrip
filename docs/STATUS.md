@@ -2,7 +2,8 @@
 
 **Product:** `$crip` / technical ID `scrip` / in-game default currency `Coins` (unchanged).
 **P03 authoritative update (2026-11-13):** P03 PASS. Server-side player and administrative commands, durable administrative audit, and frozen-account enforcement are verified.
-**P04 authoritative update (2026-11-13):** P04 organization banking implementation is complete and verified. Do not begin Phase 5 without explicit authorization.
+**P04 authoritative update (2026-11-13):** P04 organization banking implementation is complete and verified.
+**P03-M authoritative update (2026-11-14):** P03-M administrative maintenance configuration and read-only inspection controls are complete and verified. Do not begin Phase 6.
 **Current:** P01 PASS — durable journal and checkpoint feasibility proven with injected storage faults. No account or economy service implemented.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** P02 account service and atomic ledger.
@@ -72,3 +73,11 @@ Verified locally on Java 21 (2026-11-13): common tests passed with 29 tests and 
 Organization creation, owner assignment, invitations, acceptance, deposits, manager spending, membership changes, role boundaries, direct-API authorization rejection, restart replay, failed-transfer consistency, and concurrent organization payments are covered by common tests. Organizations are immutable with respect to ownership transfer and dissolution in this packet: the owner cannot be removed or demoted, and an ownership-transfer request returns a documented policy blocker without state change.
 
 P04 adds no GUI, custom permissions, loans, interest, taxation, shop inventory, or automatic organization deletion. Common tests passed with 32 tests and zero failures. Forge and NeoForge P04 artifacts both passed build verification and packaged dedicated-server smoke checks, including the vanilla-client reconnect probe.
+
+## P03-M implementation record
+
+**P03-M verification: PASS. Stop after P03-M.**
+
+Implemented administrator-only maintenance controls for durable cleanup configuration, read-only eligibility previews, and journal inspection. Defaults are enabled, 365 days inactivity, 24 hours interval, and 100 accounts per preview. The preview is bounded and reports eligibility plus explicit exclusions; it does not write or alter ledger data. `cleanup run` and `journal compact run` return `NOT_IMPLEMENTED`.
+
+Maintenance regression coverage verifies configuration validation and restart persistence, cutoff boundaries, positive-balance/frozen/organization exclusions, bounded large-account previews, and no-change preview/journal inspection. Common tests passed with 35 tests and zero failures; packaged Forge and NeoForge dedicated-server smoke checks both passed with the vanilla-client reconnect probe. Actual cleanup, deletion, scheduler work, compaction, balance forfeiture, and Phase 6 work remain excluded.

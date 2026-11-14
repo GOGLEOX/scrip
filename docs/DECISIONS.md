@@ -82,3 +82,10 @@
 - Generic `transfer` rejects organization endpoints. Only `depositToOrganization` and `spendOrganizationFunds` can reach an organization account, and each checks durable membership immediately before invoking the same atomic transfer engine.
 - Creation, invitation, acceptance, removal, and role changes are forced journal operations with a bounded organization administrative audit. The sole owner cannot be removed or demoted, preventing an orphaned active organization account.
 - Ownership succession and organization dissolution remain explicitly unresolved. P04 validates a transfer request but returns `POLICY_UNRESOLVED` without persisting a role or balance change. No irreversible fallback is authorized.
+
+## P03-M administrative maintenance controls | 2026-11-14
+
+- Maintenance configuration is durable ledger state, not a client setting or an ad hoc file. Defaults are enabled, 365 inactivity days, 24 interval hours, and a 100-account bounded preview batch; supported input ranges follow `MAINTENANCE_AND_CLEANUP.md`.
+- P03-M preview and journal commands are read-only. They never close accounts, change balances, write snapshots, compact journal data, schedule work, or run cleanup automatically.
+- The command layer requires server permission level 2 and routes to ledger-owned configuration, preview, and verification methods. Reserved `run` commands explicitly return `NOT_IMPLEMENTED` until P10-M.
+- Current exclusion evidence is limited to states implemented by the server ledger. Protected, pending-settlement, and financial-hold reasons are retained as explicit report categories with zero count until their producers are separately authorized and implemented.

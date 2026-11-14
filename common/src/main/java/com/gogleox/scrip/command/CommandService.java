@@ -9,6 +9,10 @@ import com.gogleox.scrip.account.TransferOutcome;
 import com.gogleox.scrip.account.TransferRequest;
 import com.gogleox.scrip.account.TransactionRecord;
 import com.gogleox.scrip.ledger.AccountLedger;
+import com.gogleox.scrip.maintenance.JournalMaintenancePreview;
+import com.gogleox.scrip.maintenance.MaintenanceConfiguration;
+import com.gogleox.scrip.maintenance.MaintenancePreview;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,4 +37,8 @@ public final class CommandService {
         return balanceByVerifiedPlayer(targetId).map(account -> ledger.setFrozen(operationId, account.id(), frozen, actor, reason).toCompletableFuture().join()).orElseGet(() -> AccountControlOutcome.rejected(AccountControlOutcome.Status.UNKNOWN_ACCOUNT, operationId));
     }
     public List<AdministrativeAuditRecord> audit(UUID targetId) { return balanceByVerifiedPlayer(targetId).map(account -> ledger.administrativeAudit(account.id())).orElse(List.of()); }
+    public MaintenanceConfiguration maintenanceConfiguration() { return ledger.maintenanceConfiguration(); }
+    public MaintenanceConfiguration updateMaintenanceConfiguration(UUID operationId, MaintenanceConfiguration configuration) { return ledger.updateMaintenanceConfiguration(operationId,configuration).toCompletableFuture().join(); }
+    public MaintenancePreview previewMaintenance(int inactivityDays, Collection<UUID> onlinePlayers) { return ledger.previewMaintenance(inactivityDays,onlinePlayers); }
+    public JournalMaintenancePreview journalMaintenancePreview() { return ledger.journalMaintenancePreview(); }
 }

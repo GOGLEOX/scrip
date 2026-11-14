@@ -5,6 +5,10 @@ import com.gogleox.scrip.account.AdministrativeAuditRecord;
 import com.gogleox.scrip.account.AuditActor;
 import com.gogleox.scrip.account.TransactionRecord;
 import com.gogleox.scrip.account.TransferOutcome;
+import com.gogleox.scrip.maintenance.JournalMaintenancePreview;
+import com.gogleox.scrip.maintenance.MaintenanceConfiguration;
+import com.gogleox.scrip.maintenance.MaintenanceExclusion;
+import com.gogleox.scrip.maintenance.MaintenancePreview;
 import com.mojang.logging.LogUtils;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
@@ -12,6 +16,7 @@ import com.mojang.brigadier.context.CommandContext;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 import net.minecraft.commands.CommandSourceStack;
@@ -19,6 +24,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.GameProfileArgument;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -44,6 +51,15 @@ public final class ScripCommandRegistrar {
             if (name.equals("scrip")) LOGGER.error("Scrip command namespace is already registered; Scrip will not override another mod command");
             return;
         }
+        var admin = Commands.literal("admin").requires(source -> source.hasPermission(ADMIN_PERMISSION))
+                .then(Commands.literal("balance").then(Commands.argument("player", GameProfileArgument.gameProfile()).executes(this::otherBalance)))
+                .then(adjustment("grant", false)).then(adjustment("deduct", true))
+                .then(control("freeze", true)).then(control("unfreeze", false))
+                .then(Commands.literal("audit")
+                        .then(Commands.argument("player", GameProfileArgument.gameProfile())
+                                .executes(this::audit)))
+                .then(cleanupMaintenance())
+                .then(journalMaintenance());
         dispatcher.register(Commands.literal(name)
                 .then(Commands.literal("balance").executes(this::ownBalance)
                         .then(Commands.argument("player", GameProfileArgument.gameProfile())
@@ -51,13 +67,7 @@ public final class ScripCommandRegistrar {
                 .then(Commands.literal("pay").then(Commands.argument("player", GameProfileArgument.gameProfile())
                         .then(Commands.argument("amount", LongArgumentType.longArg(1)).executes(this::pay))))
                 .then(Commands.literal("history").executes(this::history))
-                .then(Commands.literal("admin").requires(source -> source.hasPermission(ADMIN_PERMISSION))
-                        .then(Commands.literal("balance").then(Commands.argument("player", GameProfileArgument.gameProfile()).executes(this::otherBalance)))
-                        .then(adjustment("grant", false)).then(adjustment("deduct", true))
-                        .then(control("freeze", true)).then(control("unfreeze", false))
-                        .then(Commands.literal("audit")
-                                .then(Commands.argument("player", GameProfileArgument.gameProfile())
-                                        .executes(this::audit)))));
+                .then(admin));
     }
 
     private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> adjustment(String name, boolean negative) {
@@ -70,6 +80,73 @@ public final class ScripCommandRegistrar {
         return Commands.literal(name).then(Commands.argument("player", GameProfileArgument.gameProfile()).executes(context -> control(context, frozen, "command"))
                 .then(Commands.argument("reason", StringArgumentType.greedyString()).executes(context -> control(context, frozen, StringArgumentType.getString(context, "reason")))));
     }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> cleanupMaintenance() {
+        return Commands.literal("cleanup")
+                .then(Commands.literal("preview").executes(context -> cleanupPreview(context, configuredDays(context)))
+                        .then(Commands.argument("days", IntegerArgumentType.integer(1)).executes(context -> cleanupPreview(context, IntegerArgumentType.getInteger(context,"days")))))
+                .then(Commands.literal("status").executes(this::cleanupStatus))
+                .then(Commands.literal("set")
+                        .then(Commands.literal("enabled").then(Commands.argument("enabled", BoolArgumentType.bool()).executes(this::setCleanupEnabled)))
+                        .then(Commands.literal("inactivity-days").then(Commands.argument("days", IntegerArgumentType.integer(1)).executes(this::setCleanupDays)))
+                        .then(Commands.literal("interval-hours").then(Commands.argument("hours", IntegerArgumentType.integer(1)).executes(this::setCleanupInterval))))
+                .then(Commands.literal("run").executes(this::notImplemented));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> journalMaintenance() {
+        return Commands.literal("journal")
+                .then(Commands.literal("compact")
+                        .then(Commands.literal("preview").executes(this::journalPreview))
+                        .then(Commands.literal("run").executes(this::notImplemented)))
+                .then(Commands.literal("verify").executes(this::journalVerify));
+    }
+
+    private int cleanupStatus(CommandContext<CommandSourceStack> context) {
+        Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
+        MaintenanceConfiguration configuration=service.get().maintenanceConfiguration();
+        return success(context,"Cleanup: enabled="+configuration.enabled()+", inactivity-days="+configuration.inactivityDays()+", interval-hours="+configuration.intervalHours()+", batch="+configuration.maximumBatch()+".");
+    }
+    private int cleanupPreview(CommandContext<CommandSourceStack> context,int days) {
+        Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
+        try {
+            MaintenancePreview preview=service.get().previewMaintenance(days,onlinePlayers(context));
+            success(context,"Cleanup preview: scanned="+preview.scannedAccounts()+", unscanned="+preview.unscannedAccounts()+", eligible="+preview.eligibleAccounts()+".");
+            for(MaintenanceExclusion exclusion:MaintenanceExclusion.values()) success(context,exclusion.name().toLowerCase().replace('_',' ')+"="+preview.excludedByReason().get(exclusion));
+            return 1;
+        } catch(IllegalArgumentException exception) { return failure(context,"Invalid inactivity-days value."); }
+    }
+    private int setCleanupEnabled(CommandContext<CommandSourceStack> context) {
+        Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
+        MaintenanceConfiguration configuration=service.get().maintenanceConfiguration().withEnabled(BoolArgumentType.getBool(context,"enabled"));
+        return saveMaintenanceConfiguration(context,service.get(),configuration);
+    }
+    private int setCleanupDays(CommandContext<CommandSourceStack> context) {
+        Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
+        try { return saveMaintenanceConfiguration(context,service.get(),service.get().maintenanceConfiguration().withInactivityDays(IntegerArgumentType.getInteger(context,"days"))); }
+        catch(IllegalArgumentException exception) { return failure(context,"inactivity-days must be between 30 and 3650."); }
+    }
+    private int setCleanupInterval(CommandContext<CommandSourceStack> context) {
+        Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
+        try { return saveMaintenanceConfiguration(context,service.get(),service.get().maintenanceConfiguration().withIntervalHours(IntegerArgumentType.getInteger(context,"hours"))); }
+        catch(IllegalArgumentException exception) { return failure(context,"interval-hours must be between 1 and 168."); }
+    }
+    private int saveMaintenanceConfiguration(CommandContext<CommandSourceStack> context,CommandService service,MaintenanceConfiguration configuration) {
+        try { service.updateMaintenanceConfiguration(UUID.randomUUID(),configuration); return success(context,"Cleanup configuration saved."); }
+        catch(RuntimeException exception) { return failure(context,"Cleanup configuration could not be saved."); }
+    }
+    private int journalPreview(CommandContext<CommandSourceStack> context) {
+        Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
+        try { JournalMaintenancePreview preview=service.get().journalMaintenancePreview(); return success(context,"Journal compact preview: sequence="+preview.latestSequence()+", replay-entries="+preview.replayEntryCount()+", checkpoint="+preview.hasCheckpoint()+". No records changed."); }
+        catch(RuntimeException exception) { return failure(context,"Journal inspection failed."); }
+    }
+    private int journalVerify(CommandContext<CommandSourceStack> context) {
+        Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
+        try { JournalMaintenancePreview preview=service.get().journalMaintenancePreview(); return success(context,"Journal verified: sequence="+preview.latestSequence()+", replay-entries="+preview.replayEntryCount()+", checkpoint="+preview.hasCheckpoint()+"."); }
+        catch(RuntimeException exception) { return failure(context,"Journal verification failed."); }
+    }
+    private int notImplemented(CommandContext<CommandSourceStack> context) { return failure(context,"NOT_IMPLEMENTED: available in P10-M."); }
+    private int configuredDays(CommandContext<CommandSourceStack> context) { return commands.get().map(service -> service.maintenanceConfiguration().inactivityDays()).orElse(MaintenanceConfiguration.defaults().inactivityDays()); }
+    private static Set<UUID> onlinePlayers(CommandContext<CommandSourceStack> context) { return context.getSource().getServer().getPlayerList().getPlayers().stream().map(ServerPlayer::getUUID).collect(java.util.stream.Collectors.toUnmodifiableSet()); }
 
     private int ownBalance(CommandContext<CommandSourceStack> context) {
         ServerPlayer player;

@@ -1,6 +1,6 @@
 # $crip | Maintenance, Stale-Account Cleanup and Journal Compaction
 
-**Design status:** Approved scope from user on 2026-11-12; configuration values and safety rules are implementation recommendations pending testing. **No code has been implemented.**
+**Design status:** P03-M implements durable configuration, bounded read-only eligibility preview, journal inspection, and administrator command scaffolding. Cleanup, scheduling, account closure, compaction, backups, and journal retirement remain unimplemented and gated to P10-M.
 **Backend:** Versioned per-world in-memory canonical ledger, append-only forced durable journal and atomic snapshots. SQLite is not a v1 dependency. This document is normative for the cleanup feature design.
 
 ## Scope and two separate operations
@@ -95,3 +95,11 @@ Journal entries are a durable replay log and cannot be naively removed by timest
 ## Implementation sequencing
 
 P01 proves journal append/force, snapshot checksum/replay, and crash-resilience. P02 records account lifecycle and activity timestamps and durable identities. **P03-M** implements read-only preview/status and protected operator commands. **P10-M** implements automated schedule, safe durable account-closure operations, compaction and backup integration, with fault testing. No cleanup task is allowed to mutate storage until P01/P02 contracts pass. This keeps implementation work bounded.
+
+## P03-M implementation notes
+
+P03-M persists `enabled`, `inactivityDays`, `intervalHours`, and maximum preview batch in the world ledger journal. Defaults are enabled, 365 days, 24 hours, and 100 accounts per preview. The supported bounds are 30–3650 days, 1–168 hours, and a maximum batch of 1–1000.
+
+The preview is bounded to its configured batch and reports scanned, unscanned, eligible, and every exclusion reason. It never writes a ledger operation, changes a balance, closes an account, modifies history, or modifies journal records. The current ledger can actively exclude online, recently active, positive-balance, frozen, tombstoned, and organization-linked accounts. `PROTECTED`, `PENDING_SETTLEMENT`, and `FINANCIAL_HOLD` remain explicit zero-count categories until their future server-side producers are implemented; P03-M does not infer those states.
+
+`cleanup run` and `journal compact run` return `NOT_IMPLEMENTED` until P10-M. `journal compact preview` and `journal verify` are read-only calls to the existing verification boundary.

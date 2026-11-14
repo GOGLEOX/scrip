@@ -54,6 +54,12 @@ Personal deposits and authorized organization spending call the same atomic tran
 
 Ownership transfer deliberately performs no mutation and reports a policy-unresolved result. Organization dissolution, automatic deletion, custom permissions, loans, interest, taxes, and shops remain outside P04. This preserves the owner-to-account binding and prevents orphaned organization balances until an explicit succession or dissolution policy is approved.
 
+## Implemented in P03-M
+
+Maintenance controls are server-only children of `/scrip admin`. `cleanup preview [days]`, `cleanup status`, and the three `cleanup set` controls operate on one durable world-local maintenance configuration. `journal compact preview` and `journal verify` call the existing non-mutating ledger verification boundary. Both execution commands are deliberately reserved and return `NOT_IMPLEMENTED`.
+
+Preview work is bounded by the persisted maximum batch (default 100), reports scanned and unscanned counts, and classifies every scanned personal account as eligible or excluded. It uses persisted account timestamps, server-observed online identities, balance, lifecycle, and organization membership; it never changes accounts, balances, history, claims, journal records, or snapshots. Settlement, hold, and protection exclusions remain visible zero-count categories until their server-side state producers exist.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.
