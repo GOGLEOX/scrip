@@ -38,10 +38,10 @@ Source: https://www.curseforge.com/minecraft/mc-mods/starter-kit/files/9259631 .
 
 ## 4. FTB Quests integration
 Docs: https://docs.feed-the-beast.com/mod-docs/1.21.1/mods/suite/Quests/Developer/Quests/Rewards/Command_Reward/ .
-- Named target is **NeoForge 1.21.1 only**; Forge counterpart is unverified/absent per supplied file-level research. Do not imply cross-loader FTB mod support.
-- Start with FTB Command Reward invoking server-trusted $crip award. Optional native adapter after exact public API behavior and merit are proven.
-- Decide team completion vs per-player payout; server validates effective recipient and stable claim ID.
-- Tests: quest claim replay, duplicate command, team membership changes, logout, restart, unauthorized execution, invalid UUID, once-only vs repeatable.
+- P07-C target is **NeoForge 1.21.1 only**; Forge explicitly keeps this source disabled. FTB's verified Command Reward uses `player.createCommandSourceStack()`, then may elevate to the configured permission level. The $crip recipe therefore uses `@s` and requires FTB permission level 2.
+- The static command field contains `quest-id:reward-id`; `$crip` validates the hex pair and appends the verified command player's UUID before calling the trusted reward API. This creates a durable once-only identity without trusting FTB's `{p}` display-name formatter.
+- FTB's Command Reward obtains team variables but invokes its command once for the supplied claiming player and does not enumerate team members. Team-wide distribution and repeatable rewards remain unsupported policy blockers.
+- No native FTB custom reward API is used or inferred. The exact NeoForge binary pair remains a compatibility-matrix release test.
 
 ## 5. First-party shop provider
 An eventual GOGLEOX shop mod/plug-in will call a **stable neutral port** from the same server-side $crip process or an explicit separate protocol if built for another platform. First version is **API contract + sample consumer**, not shop mod implementation.

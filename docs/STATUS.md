@@ -8,7 +8,8 @@
 **P06 authoritative update (2026-11-14):** P06 gameplay reward and starter-grant foundation is complete and verified.
 **P07-A authoritative update (2026-11-14):** P07-A public economy API and integration bridge is complete and verified.
 **P07-B authoritative update (2026-11-14):** P07-B optional Serilum Starter Kit command bridge is complete. Exact Starter Kit+Collective binary-pair testing remains a release-matrix blocker.
-**Current:** P07-B PASS with a documented binary-matrix blocker. Stop after P07-B.
+**P07-C authoritative update (2026-11-14):** P07-C optional FTB Quests NeoForge command bridge is complete. Exact FTB Quests binary-pair testing remains a release-matrix blocker.
+**Current:** P07-C PASS with documented binary-matrix blockers. Stop after P07-C.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** A separately authorized packet only.
 **Approved backend:** Durable in-memory snapshot + append-only forced journal (ADR-0001 ACCEPTED); SQLite not in v1.  
@@ -117,3 +118,11 @@ Verification on Java 21: `:common:test` passed 44 tests with zero failures; `bui
 P07-B implements an optional, command-on-kit bridge without compiling against Serilum. Both loaders detect the `starterkit` and `collective` pair; a missing pair rejects kit grants and leaves normal server operation unchanged. The only accepted kit path is the documented server command context with `@s` resolving to the recipient entity. It validates that context, the exact configured amount, `STARTER_KIT` mode, and a fixed marker before using the permanent `starter_grant:<UUID>` claim.
 
 Verification on Java 21: `:common:test` passed 45 tests with zero failures; `build verifyArtifacts` verified both P07-B loader artifacts; packaged Forge and NeoForge dedicated-server checks passed without Starter Kit or Collective and completed the vanilla reconnect probe. Common regression coverage verifies absent dependency rejection, recipient-context mismatch rejection, amount mismatch rejection, issue, duplicate reissue, restart replay, and canonical claim persistence. Source inspection verifies the Starter Kit command context; running the exact pinned Starter Kit+Collective artifacts on both loaders remains required before advertising binary compatibility.
+
+## P07-C implementation record
+
+**P07-C verification: PASS with release-matrix blocker. Stop after P07-C.**
+
+P07-C adds no FTB dependency. NeoForge detects `ftbquests` at runtime; Forge keeps the source disabled. The command reward bridge accepts only the verified player command context, static hexadecimal quest/reward IDs, a positive bounded amount, and a known account, then routes issuance through the P07-A trusted API. It derives the UUID-bound one-time claim itself. Repeatable and team-wide payouts remain unsupported by design.
+
+Verification on Java 21: `:common:test` passed 46 tests with zero failures; `build verifyArtifacts` verified both P07-C loader artifacts; packaged Forge and NeoForge dedicated-server checks passed without FTB Quests and completed the vanilla reconnect probe. Common regression coverage verifies missing-mod rejection, invalid/mismatched command context, valid issue, duplicate callback, restart replay, and rename-safe UUID identity. Exact FTB Quests NeoForge binary installation/completion and team behavior remain release-matrix evidence required before full runtime compatibility can be claimed.

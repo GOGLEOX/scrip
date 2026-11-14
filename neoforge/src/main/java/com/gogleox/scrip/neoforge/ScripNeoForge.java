@@ -36,10 +36,11 @@ public final class ScripNeoForge {
         ledger = AccountLedger.open(event.getServer().getWorldPath(LevelResource.ROOT).resolve("scrip"), CurrencyDefinition.defaultCurrency());
         commands = new CommandService(ledger);
         commands.setStarterKitCompatible(ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
+        commands.setFtbQuestsCompatible(ModList.get().isLoaded("ftbquests"));
     }
 
     private void serverStarted(ServerStartedEvent event) {
-        LOGGER.info("Scrip P07-B server ready (NeoForge); currency default: {}; Starter Kit compatible: {}", Scrip.DEFAULT_CURRENCY, ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
+        LOGGER.info("Scrip P07-C server ready (NeoForge); currency default: {}; Starter Kit compatible: {}; FTB Quests compatible: {}", Scrip.DEFAULT_CURRENCY, ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"), ModList.get().isLoaded("ftbquests"));
     }
 
     private void serverStopping(ServerStoppingEvent event) {

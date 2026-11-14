@@ -30,11 +30,14 @@ public final class CommandService {
     private final TrustedRewardSourceRegistry trustedRewardSources;
     private final DefaultEconomyService economy;
     private volatile boolean starterKitCompatible;
+    private volatile boolean ftbQuestsCompatible;
 
-    public CommandService(AccountLedger ledger) { this.ledger = ledger; this.payments=new PaymentService(ledger); this.rewards=new RewardService(ledger); this.trustedRewardSources=new TrustedRewardSourceRegistry();this.trustedRewardSources.register(new TrustedRewardSource("command",100_000,true));this.economy=new DefaultEconomyService(ledger,trustedRewardSources,ignored->false); }
+    public CommandService(AccountLedger ledger) { this.ledger = ledger; this.payments=new PaymentService(ledger); this.rewards=new RewardService(ledger); this.trustedRewardSources=new TrustedRewardSourceRegistry();this.trustedRewardSources.register(new TrustedRewardSource("command",100_000,true));this.trustedRewardSources.register(new TrustedRewardSource("ftb-quests",100_000,true));this.economy=new DefaultEconomyService(ledger,trustedRewardSources,ignored->false); }
     public void playerJoined(UUID playerId) { rewards.starterGrant(playerId, StarterGrantMode.FIRST_JOIN); }
     /** Loader adapters set this from their own optional-mod discovery; the common module has no Serilum dependency. */
     public void setStarterKitCompatible(boolean compatible) { starterKitCompatible=compatible; }
+    /** FTB Quests is NeoForge-only in the supported 1.21.1 matrix. */
+    public void setFtbQuestsCompatible(boolean compatible) { ftbQuestsCompatible=compatible; }
     public Optional<AccountSnapshot> balance(UUID playerId) { return ledger.findPersonal(playerId); }
     public Optional<AccountSnapshot> balanceByVerifiedPlayer(UUID playerId) { return ledger.findPersonal(playerId); }
     public TransferOutcome pay(UUID senderId, UUID recipientId, long amount, UUID operationId) {
@@ -64,5 +67,11 @@ public final class CommandService {
         if(!starterKitCompatible || !commandPlayer.equals(recipient) || !"starter".equals(claimId)) return new IntegrationRewardResponse(IntegrationRewardResponse.Status.UNAUTHORIZED_SOURCE,null,java.util.OptionalLong.empty());
         if(ledger.rewardConfiguration().starterGrant()!=configuredAmount) return new IntegrationRewardResponse(IntegrationRewardResponse.Status.INVALID,null,java.util.OptionalLong.empty());
         return switch(rewards.starterGrant(recipient,StarterGrantMode.STARTER_KIT)) { case ISSUED -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.ISSUED,null,java.util.OptionalLong.empty()); case DUPLICATE -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.DUPLICATE,null,java.util.OptionalLong.empty()); case DISABLED -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.INVALID,null,java.util.OptionalLong.empty()); case UNKNOWN_PLAYER -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.UNKNOWN_PLAYER,null,java.util.OptionalLong.empty()); default -> new IntegrationRewardResponse(IntegrationRewardResponse.Status.STORAGE_FAILURE,null,java.util.OptionalLong.empty()); };
+    }
+    /** FTB Command Reward source is the claiming player; quest and reward IDs form the static part of an once-only claim. */
+    public IntegrationRewardResponse ftbQuestReward(UUID commandPlayer, UUID recipient, String questRewardId, long amount) {
+        if(!ftbQuestsCompatible || !commandPlayer.equals(recipient) || questRewardId==null || !questRewardId.matches("[0-9A-Fa-f]{1,16}:[0-9A-Fa-f]{1,16}")) return new IntegrationRewardResponse(IntegrationRewardResponse.Status.UNAUTHORIZED_SOURCE,null,java.util.OptionalLong.empty());
+        String[] ids=questRewardId.split(":",-1);String claim="quest:"+ids[0].toLowerCase(java.util.Locale.ROOT)+":reward:"+ids[1].toLowerCase(java.util.Locale.ROOT)+":player:"+recipient;
+        return integrationReward("ftb-quests",claim,recipient,amount);
     }
 }

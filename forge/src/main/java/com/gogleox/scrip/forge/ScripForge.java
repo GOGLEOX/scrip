@@ -39,7 +39,7 @@ public final class ScripForge {
     }
 
     private void serverStarted(ServerStartedEvent event) {
-        LOGGER.info("Scrip P07-B server ready (Forge); currency default: {}; Starter Kit compatible: {}", Scrip.DEFAULT_CURRENCY, ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
+        LOGGER.info("Scrip P07-C server ready (Forge); currency default: {}; Starter Kit compatible: {}; FTB Quests integration disabled on Forge", Scrip.DEFAULT_CURRENCY, ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
     }
 
     private void serverStopping(ServerStoppingEvent event) {

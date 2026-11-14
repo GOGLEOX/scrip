@@ -115,3 +115,9 @@
 - The adapter is command-context integration only. Source inspection establishes that Starter Kit runs kit-file commands as the server with the recipient as `@s`; $crip relies on that entity context and independently verifies recipient equality.
 - The static command-file marker is never an identity or claim key. $crip derives the permanent `starter_grant:<UUID>` claim, and requires configured `STARTER_KIT` mode and exact configured amount. This prevents first-join plus kit double payment.
 - Starter Kit and Collective are optional discovery signals, not compile dependencies. The source-verified mechanism is not advertised as a fully verified binary matrix until the pinned target pair runs on both loaders.
+
+## P07-C FTB Quests command rewards | 2026-11-14
+
+- FTB Quests Command Reward is a NeoForge-only optional integration. Its verified 1.21.1 source creates the command context from the claiming `ServerPlayer`; `$crip` resolves `@s` from that context and does not trust the name-only `{p}` replacement.
+- A static validated `quest-id:reward-id` pair plus the server-resolved player UUID forms the durable once-only claim. Duplicate callbacks, relog, restart, and rename cannot issue again.
+- Repeatable claims and team-wide payouts are not implemented. The command reward has no verified unique occurrence field, and its team metadata does not direct $crip to enumerate or pay members.

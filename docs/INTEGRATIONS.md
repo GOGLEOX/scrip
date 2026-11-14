@@ -19,9 +19,17 @@ This file lists concrete sources selected for planning and desired user-facing b
 ## Priority 1: FTB Quests
 - Project: https://www.curseforge.com/minecraft/mc-mods/ftb-quests-forge ; source: https://github.com/FTBTeam/FTB-Quests .
 - Official command reward docs for 1.21.1: https://docs.feed-the-beast.com/mod-docs/1.21.1/mods/suite/Quests/Developer/Quests/Rewards/Command_Reward/ .
-- Exact named support target: NeoForge 1.21.1. Forge 1.21.1 FTB Quests version not verified in the supplied research.
-- First milestone is documented secure once-only Coin reward via command, not compiled FTB dependency. Later native custom-reward UX is optional if documentation and tests show value.
-- Team and repeatable-reward semantics require a separate verified identity and configuration policy.
+- P07-C supports **NeoForge 1.21.1 only** through FTB's Command Reward; it adds no FTB classes or dependency. Forge always rejects the `ftb-quests` source and is not advertised as compatible.
+- The verified 1.21.1 Command Reward creates a command source from the claiming `ServerPlayer` and applies the configured permission level. Configure each once-only FTB Command Reward at permission level **2**, with a stable quest/reward ID pair and this command (example IDs and amount only):
+
+  ```text
+  /scrip integration reward ftb-quests 570F25BE1914AE96:0F1E2D3C4B5A6978 @s 250
+  ```
+
+  Use the immutable FTB quest ID, a colon, and the immutable FTB reward ID. `$crip` resolves `@s` from FTB's verified player command source and creates the durable identity `ftb-quests + player UUID + quest ID + reward ID`; never use `{p}` as an identity and never use a player name in the claim field.
+- One-time rewards only: the same configured reward for the same player returns a durable duplicate after retries, restart, rejoin, or rename. Repeatable rewards are unsupported because Command Reward exposes no verified unique completion occurrence to this bridge.
+- Team-wide payout is unsupported. The verified FTB reward implementation passes one claiming `ServerPlayer` to the command and provides team values only as command-format variables; it does not enumerate members. Do not assume or configure automatic payment to every team member until a separately approved policy and verified occurrence identity exist.
+- Missing FTB Quests leaves the server operational and rejects this source. A pinned FTB Quests NeoForge binary run remains required before representing the runtime pair as fully verified.
 
 ## Priority 1: Future GOGLEOX shop
 - Work on a provider API (`ShopEconomyPort`) and consumer tests only, so the future GOGLEOX shop mod can be started in another repository without migration of Coins.

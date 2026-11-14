@@ -86,6 +86,12 @@ P07-B keeps Starter Kit optional and dependency-free. Loader adapters check for 
 
 No Serilum class is linked or loaded, no native event is subscribed, and an absent or incomplete Serilum installation cannot change $crip behavior. The supported integration surface is the documented kit command-file execution context only.
 
+## Implemented in P07-C
+
+P07-C uses no FTB classes. NeoForge optionally detects `ftbquests`, while Forge leaves the FTB source disabled. FTB Command Reward creates its command source from the claiming player; `$crip` requires that verified source entity to equal `@s`, validates a static hex `quest-id:reward-id` pair, and derives the recipient UUID portion of the durable claim itself. The resulting reward is issued only through the P07-A trusted API boundary.
+
+The bridge intentionally supports only one-time individual command rewards. Repeatable rewards lack a verified occurrence identifier, and team-wide distribution lacks an approved recipient policy. Both remain excluded rather than inferred from FTB's command-format team variables.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.
