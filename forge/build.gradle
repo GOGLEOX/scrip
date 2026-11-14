@@ -1,0 +1,24 @@
+plugins { id 'net.minecraftforge.gradle' version '6.0.36' }
+
+minecraft {
+    mappings channel: 'official', version: rootProject.minecraft_version
+    reobf = false
+    copyIdeResources = true
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'info'
+            mods {
+                scrip {
+                    source sourceSets.main
+                    source project(':common').sourceSets.main
+                }
+            }
+        }
+        client {}
+        server { args '--nogui' }
+    }
+}
+dependencies {
+    minecraft "net.minecraftforge:forge:${rootProject.minecraft_version}-${rootProject.forge_version}"
+}

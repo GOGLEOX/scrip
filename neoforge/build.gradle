@@ -1,0 +1,19 @@
+plugins { id 'net.neoforged.moddev' version '2.0.107' }
+
+neoForge {
+    version = rootProject.neo_version
+    runs {
+        client { client() }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+        configureEach { gameDirectory = project.file('run') }
+    }
+    mods {
+        scrip {
+            sourceSet sourceSets.main
+            sourceSet project(':common').sourceSets.main
+        }
+    }
+}

@@ -1,0 +1,10 @@
+.gradle/
+**/build/
+**/run/
+.tools/
+.idea/
+*.iml
+.vscode/
+**/node_modules/
+**/__pycache__/
+installer.log

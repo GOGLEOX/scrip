@@ -1,0 +1,24 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="GOGLEOX Foundry"
+description='''P00 development scaffold. Forged in Fire, Crafted in Utility. No economy features yet.'''
+
+[[dependencies.scrip]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.172,21.2)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.scrip]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="NONE"
+side="BOTH"

@@ -1,0 +1,80 @@
+plugins { id 'base' }
+
+allprojects {
+    version = rootProject.mod_version
+    group = rootProject.mod_group
+}
+
+subprojects {
+    apply plugin: 'java-library'
+    java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+    repositories { mavenCentral() }
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = 21
+    }
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+        testLogging { events 'passed', 'skipped', 'failed' }
+    }
+    tasks.withType(JavaExec).configureEach { standardInput = System.in }
+    if (name != 'common') {
+        dependencies { implementation project(':common') }
+        tasks.named('jar', Jar) {
+            from project(':common').sourceSets.main.output
+            archiveFileName = "scrip-${rootProject.minecraft_version}-${project.name}-v${project.version}.jar"
+        }
+        tasks.named('processResources', ProcessResources) {
+            def metadata = [mod_id: rootProject.mod_id, mod_name: rootProject.mod_name,
+                mod_version: project.version, mod_license: rootProject.mod_license]
+            inputs.properties(metadata)
+            filesMatching('META-INF/*.toml') { expand(metadata) }
+        }
+    }
+}
+
+tasks.named('build') { dependsOn ':common:build', ':forge:build', ':neoforge:build' }
+tasks.named('check') { dependsOn ':common:check', ':forge:check', ':neoforge:check' }
+
+tasks.register('verifyArtifacts') {
+    group = 'verification'
+    description = 'Checks packaged identities, version parity, common classes and loader isolation.'
+    dependsOn ':forge:jar', ':neoforge:jar'
+    doLast {
+        ['forge', 'neoforge'].each { loader ->
+            def artifact = project(":${loader}").tasks.named('jar').get().archiveFile.get().asFile
+            assert artifact.name == "scrip-${minecraft_version}-${loader}-v${version}.jar"
+            new java.util.zip.ZipFile(artifact).withCloseable { zip ->
+                def descriptor = loader == 'forge' ? 'mods.toml' : 'neoforge.mods.toml'
+                def other = loader == 'forge' ? 'neoforge.mods.toml' : 'mods.toml'
+                assert zip.getEntry("META-INF/${other}") == null
+                def entry = zip.getEntry("META-INF/${descriptor}")
+                assert entry != null
+                def metadata = zip.getInputStream(entry).getText('UTF-8')
+                assert metadata.contains('modId="scrip"')
+                assert metadata.contains('displayName="$crip"')
+                assert metadata.contains("version=\"${version}\"")
+                assert metadata.contains('versionRange="[1.21.1]"')
+                assert !metadata.contains('${')
+                ['Scrip', 'account/AccountId', 'account/Balance', 'api/EconomyFacade'].each { type ->
+                    assert zip.getEntry("com/gogleox/scrip/${type}.class") != null
+                }
+                zip.entries().each { item ->
+                    if (item.name.endsWith('.class')) {
+                        def bytes = zip.getInputStream(item).bytes
+                        assert ((bytes[6] & 255) << 8 | (bytes[7] & 255)) == 65
+                        def constants = new String(bytes, java.nio.charset.StandardCharsets.ISO_8859_1)
+                        assert !constants.contains('net/minecraft/client/')
+                        assert !constants.contains(loader == 'forge' ? 'net/neoforged/' : 'net/minecraftforge/')
+                    }
+                }
+            }
+            logger.lifecycle("Verified ${artifact.name}: identity, version, Java 21, shared classes, loader isolation")
+        }
+    }
+}
+tasks.named('check') { dependsOn 'verifyArtifacts' }
