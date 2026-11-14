@@ -1,6 +1,7 @@
 # $crip | Implementation Status
 
 **Product:** `$crip` / technical ID `scrip` / in-game default currency `Coins` (unchanged).
+**P03 authoritative update (2026-11-13):** P03 PASS. Server-side player and administrative commands, durable administrative audit, and frozen-account enforcement are verified. Do not begin Phase 4 without explicit authorization.
 **Current:** P01 PASS — durable journal and checkpoint feasibility proven with injected storage faults. No account or economy service implemented.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** P02 account service and atomic ledger.
@@ -49,6 +50,16 @@ Record changed files, exact test commands/results, blockers, format/schema chang
 
 `./gradlew.bat :common:test --no-daemon --console=plain` passed with 26 tests and zero failures. `./gradlew.bat build verifyArtifacts --no-daemon --console=plain` passed and verified both P02 jars. Packaged Forge and NeoForge dedicated-server probes both passed startup, clean shutdown, and two vanilla-client reconnects.
 
-P02 account-ledger code is present, but P02 is not yet verified. `AccountLedger` provides UUID-keyed personal accounts, durable verified-player registry entries, indexed account lookup, one world-local currency definition, lifecycle representation, bounded per-account history, permanent claim markers, and replay reconstruction. Transfers and internal adjustments use checked signed 64-bit arithmetic and a single serialized writer. A transfer becomes visible only after the journal receipt and carries its complete debit-and-credit intent in one operation. Exact operation retries are idempotent; conflicting reuse is rejected.
+Historical pre-verification note (superseded by the P02 PASS record above): `AccountLedger` provides UUID-keyed personal accounts, durable verified-player registry entries, indexed account lookup, one world-local currency definition, lifecycle representation, bounded per-account history, permanent claim markers, and replay reconstruction. Transfers and internal adjustments use checked signed 64-bit arithmetic and a single serialized writer. A transfer becomes visible only after the journal receipt and carries its complete debit-and-credit intent in one operation. Exact operation retries are idempotent; conflicting reuse is rejected.
 
-New automated coverage defines account creation, restart, rename, valid and invalid transfers, overflow protection, duplicate-operation handling, concurrent transfer serialization, history rollover, permanent claims, and an injected force-boundary transfer failure. Common production and test sources compiled with Java 21, and the JUnit launcher executed 26 tests with 26 successes and zero failures. A separate manual Java 21 exercise created accounts, committed a transfer, retried its operation identifier, and reopened from the journal with the same balances. The Gradle test and build commands were also attempted after this change but could not start because the local Gradle launcher could not establish its loopback transport. Therefore no Gradle P02 test run, Forge build, NeoForge build, or dedicated-server startup is reported as passing. P02 verification is the only next permitted work; do not begin P03.
+Historical preliminary test note (superseded by the P02 PASS and P03 verification records): the common production and test sources compiled with Java 21, and the JUnit launcher executed 26 tests with 26 successes and zero failures before the later complete Gradle and dedicated-server verification.
+
+## P03 implementation record
+
+**P03 verification: PASS. Phase 4 is not authorized.**
+
+The command tree supplies `/scrip balance`, `/scrip balance <player>`, `/scrip pay <player> <amount>`, and `/scrip history`, plus permission-level-2 `/scrip admin balance|grant|deduct|freeze|unfreeze|audit`. Player profiles are validated by the logical server and then by known UUID account identity, so unknown recipients are rejected while previously joined offline recipients and renamed players remain resolvable. Every balance mutation reaches `AccountLedger`; administrative mutations use durable attributable records. Frozen source accounts cannot pay.
+
+Aliases use the bounded `scrip.command.aliases` JVM property. Conflicting commands are left untouched and reported as warnings. No GUI, HUD, organization banking, confirmation flow, rewards, cleanup execution, or journal compaction was introduced.
+
+Verified locally on Java 21 (2026-11-13): common tests passed with 29 tests and zero failures after applying the documented local loopback transport override. The full build and artifact verification compiled both loader command adapters and passed. Production dedicated-server smoke checks for Forge and NeoForge each reached readiness, shut down cleanly, and completed two vanilla-client reconnects with no client mod installed. A development Forge run remains blocked by a local ModLauncher `jopt.simple` module-resolution fault; the packaged Forge dedicated-server check passed.

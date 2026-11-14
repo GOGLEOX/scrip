@@ -66,3 +66,11 @@
 - A transfer has a caller-supplied UUID operation identifier. Exact retries return the original receipt; reuse with different source, destination, or amount is rejected. Restart recovery rebuilds this information from the journal.
 - One named currency is established by the first durable account-ledger record for a world. Reopening with another name fails rather than silently changing currency semantics.
 - Account-facing history is capped at 100 entries. Permanent claim identifiers are separate durable state. Tombstone and organization type forms are represented without enabling later behavior.
+
+## P03 commands and administrative controls | 2026-11-13
+
+- `/scrip` is the permanent primary command namespace. It is registered independently through Forge and NeoForge command events; an existing root command is never overwritten.
+- Command targets are Minecraft server-resolved game profiles and are accepted only if their UUID already maps to a ledger-known account. Names are display and lookup aids only; no command accepts a user-supplied UUID.
+- Administrative commands require server permission level 2. The command adapter derives the acting player identity from the authenticated command source; non-player administrative execution records the fixed `console` principal.
+- P03 introduces durable `admin-adjust` and `account-freeze` journal operations rather than any command-owned balance or freeze state. Administrative audit history is bounded to 1,000 newest records. This does not authorize maintenance cleanup, compaction, organization banking, or integration rewards.
+- Aliases are bounded, opt-in server startup configuration through `scrip.command.aliases`. Invalid labels, the protected `scrip` label, duplicates, and existing root-command collisions cannot replace another mod command; collisions produce a server warning.

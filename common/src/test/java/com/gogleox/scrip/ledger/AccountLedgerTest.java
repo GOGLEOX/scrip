@@ -31,4 +31,20 @@ class AccountLedgerTest {
         try(AccountLedger l=AccountLedger.open(JournalFileLedgerStore.open(directory,128,injector),CurrencyDefinition.defaultCurrency())) { AccountId a=l.registerPlayer(ALICE,"Alice").toCompletableFuture().join().id(),b=l.registerPlayer(BOB,"Bob").toCompletableFuture().join().id();l.adjust(new AdjustmentRequest(UUID.randomUUID(),a,10,"seed")).toCompletableFuture().join();fail.set(true);assertEquals(TransferOutcome.Status.STORAGE_FAILURE,l.transfer(new TransferRequest(UUID.randomUUID(),a,b,10)).toCompletableFuture().join().status());assertEquals(10,l.findAccount(a).orElseThrow().balance().units());assertEquals(0,l.findAccount(b).orElseThrow().balance().units()); }
         try(AccountLedger l=AccountLedger.open(directory,CurrencyDefinition.defaultCurrency())) { assertEquals(10,l.findPersonal(ALICE).orElseThrow().balance().units()+l.findPersonal(BOB).orElseThrow().balance().units()); }
     }
+    @Test void freezesOutgoingTransfersAndPreservesAdministrativeAuditAcrossRestart() {
+        UUID admin=UUID.fromString("00000000-0000-0000-0000-000000000003");
+        try(AccountLedger l=AccountLedger.open(directory,CurrencyDefinition.defaultCurrency())) {
+            AccountId a=l.registerPlayer(ALICE,"Alice").toCompletableFuture().join().id(), b=l.registerPlayer(BOB,"Bob").toCompletableFuture().join().id();
+            l.adjust(new AdjustmentRequest(UUID.randomUUID(),a,100,"seed")).toCompletableFuture().join();
+            assertEquals(AccountControlOutcome.Status.SUCCESS,l.setFrozen(UUID.randomUUID(),a,true,AuditActor.player(admin,"Admin"),"review").toCompletableFuture().join().status());
+            assertEquals(TransferOutcome.Status.FROZEN_ACCOUNT,l.transfer(new TransferRequest(UUID.randomUUID(),a,b,1)).toCompletableFuture().join().status());
+            assertEquals(TransferOutcome.Status.SUCCESS,l.adjustAdministratively(new AdminAdjustmentRequest(UUID.randomUUID(),a,5,"correction",AuditActor.player(admin,"Admin"))).toCompletableFuture().join().status());
+            assertEquals(2,l.administrativeAudit(a).size());
+        }
+        try(AccountLedger l=AccountLedger.open(directory,CurrencyDefinition.defaultCurrency())) {
+            assertEquals(AccountLifecycle.FROZEN,l.findPersonal(ALICE).orElseThrow().lifecycle());
+            assertEquals(105,l.findPersonal(ALICE).orElseThrow().balance().units());
+            assertEquals(2,l.administrativeAudit().size());
+        }
+    }
 }

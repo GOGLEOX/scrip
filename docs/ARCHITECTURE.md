@@ -34,6 +34,16 @@ Account opening, player activity, transfers, internal adjustments, claims, and r
 
 Organization account type and tombstone lifecycle forms are reserved in the shared domain model only. Organization behavior, rewards, fees, commands, GUI, shop behavior, and cleanup execution are not part of P02.
 
+## Implemented in P03
+
+`/scrip` is registered during each loader's native command-registration lifecycle and executes only on the logical server. The shared Minecraft command tree is compiled into each loader artifact, while `common` remains free of Minecraft and loader APIs. Forge and NeoForge adapters open one world-local `AccountLedger` at server start, register verified joining-player UUID/name pairs, and close it during server stop.
+
+Player operations are `balance`, `balance <player>` (operator inspection), `pay <player> <amount>`, and `history`. Targets are resolved from Minecraft's server-authoritative game-profile argument and accepted only when their UUID has a known personal account; this supports previously joined offline players and a changed name without accepting arbitrary names or UUID strings.
+
+Administrative operations live beneath `/scrip admin`: `balance`, `grant`, `deduct`, `freeze`, `unfreeze`, and `audit`. They require server permission level 2. The audit command reports both account transactions and administrative records. Grants, deductions, freezes, and unfreezes are durable ledger operations carrying the authenticated player actor or the console principal, bounded reason, account, amount where applicable, and durable sequence. The ledger retains the newest 1,000 administrative audit records in addition to the per-account transaction history.
+
+Frozen accounts cannot originate transfers, though their balances can still receive a server-authorized administrative correction. No command writes balance state directly. Optional aliases come from the bounded `scrip.command.aliases` JVM property; invalid labels are ignored, collisions are logged and skipped, and neither aliases nor the `/scrip` root overwrite another registered command. Commands use only server text feedback and require no client-side mod or payload.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

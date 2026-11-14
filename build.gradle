@@ -24,6 +24,7 @@ subprojects {
     tasks.withType(JavaExec).configureEach { standardInput = System.in }
     if (name != 'common') {
         dependencies { implementation project(':common') }
+        sourceSets.main.java.srcDir rootProject.file('common/src/platform/java')
         tasks.named('jar', Jar) {
             from project(':common').sourceSets.main.output
             archiveFileName = "scrip-${rootProject.minecraft_version}-${project.name}-v${project.version}.jar"

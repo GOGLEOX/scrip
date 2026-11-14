@@ -88,7 +88,7 @@ def main():
                 continue
             if line is None:
                 break
-            if "Scrip P00 server ready" in line:
+            if "Scrip P" in line and "server ready" in line:
                 ready = True
                 evidence.append(f"{args.loader}: Scrip server-started hook observed")
             if 'Done (' in line:

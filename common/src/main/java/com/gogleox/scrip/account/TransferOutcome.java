@@ -10,6 +10,7 @@ public record TransferOutcome(Status status, UUID operationId, OptionalLong dura
         INVALID_AMOUNT,
         UNKNOWN_ACCOUNT,
         ACCOUNT_TOMBSTONED,
+        FROZEN_ACCOUNT,
         SAME_ACCOUNT,
         INSUFFICIENT_FUNDS,
         DESTINATION_OVERFLOW,
