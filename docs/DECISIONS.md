@@ -89,3 +89,10 @@
 - P03-M preview and journal commands are read-only. They never close accounts, change balances, write snapshots, compact journal data, schedule work, or run cleanup automatically.
 - The command layer requires server permission level 2 and routes to ledger-owned configuration, preview, and verification methods. Reserved `run` commands explicitly return `NOT_IMPLEMENTED` until P10-M.
 - Current exclusion evidence is limited to states implemented by the server ledger. Protected, pending-settlement, and financial-hold reasons are retained as explicit report categories with zero count until their producers are separately authorized and implemented.
+
+## P05 fees and payment confirmation | 2026-11-14
+
+- Payment policy permits exactly one fee mode: disabled, flat, or percentage basis points. Fee combinations remain disabled until separately approved.
+- A durable non-spendable fee reserve records collected fees so payment settlement conserves value without choosing the pending burn-versus-treasury policy.
+- Confirmations are server-generated, memory-resident, single-use previews. They are not persisted or client-created; a crash safely requires a new preview while any committed payment is recovered from the journal.
+- The confirmation threshold is 2,000 Coins based only on payment amount. Policy revision changes, account lifecycle changes, organization-role changes, balance changes, expiration, and nonce reuse invalidate final settlement.

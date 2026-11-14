@@ -60,6 +60,14 @@ Maintenance controls are server-only children of `/scrip admin`. `cleanup previe
 
 Preview work is bounded by the persisted maximum batch (default 100), reports scanned and unscanned counts, and classifies every scanned personal account as eligible or excluded. It uses persisted account timestamps, server-observed online identities, balance, lifecycle, and organization membership; it never changes accounts, balances, history, claims, journal records, or snapshots. Settlement, hold, and protection exclusions remain visible zero-count categories until their server-side state producers exist.
 
+## Implemented in P05
+
+The ledger persists one payment policy with a monotonically advancing revision. Fees are disabled by default and may be either a flat whole-unit amount or a percentage in basis points; combined fees are not represented. Percentage calculation rounds upward using checked integer arithmetic. Confirmed payments commit payment amount, calculated fee, policy revision, and both account changes as one forced journal operation.
+
+Fees enter a durable non-spendable fee reserve, preserving ledger value without selecting the still-unapproved burn or treasury destination. `PaymentService` creates server-only, bounded, single-use previews that bind actor, source, destination, amount, fee, revision, and expiry. Confirmation revalidates all bindings, authorization, policy revision, lifecycle, and balance immediately before journal settlement. Previews disappear on restart; a committed payment replays safely from its durable operation.
+
+`/scrip pay` displays amount, fee, and total debit. Payments at or above 2,000 Coins require `/scrip confirm <nonce>`; lower payments execute after the same server-side preview and revalidation. No client payload or GUI is required.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

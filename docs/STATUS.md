@@ -4,6 +4,7 @@
 **P03 authoritative update (2026-11-13):** P03 PASS. Server-side player and administrative commands, durable administrative audit, and frozen-account enforcement are verified.
 **P04 authoritative update (2026-11-13):** P04 organization banking implementation is complete and verified.
 **P03-M authoritative update (2026-11-14):** P03-M administrative maintenance configuration and read-only inspection controls are complete and verified. Do not begin Phase 6.
+**P05 authoritative update (2026-11-14):** P05 fees and server-authoritative payment confirmations are complete and verified. Do not begin Phase 6.
 **Current:** P01 PASS — durable journal and checkpoint feasibility proven with injected storage faults. No account or economy service implemented.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** P02 account service and atomic ledger.
@@ -81,3 +82,9 @@ P04 adds no GUI, custom permissions, loans, interest, taxation, shop inventory, 
 Implemented administrator-only maintenance controls for durable cleanup configuration, read-only eligibility previews, and journal inspection. Defaults are enabled, 365 days inactivity, 24 hours interval, and 100 accounts per preview. The preview is bounded and reports eligibility plus explicit exclusions; it does not write or alter ledger data. `cleanup run` and `journal compact run` return `NOT_IMPLEMENTED`.
 
 Maintenance regression coverage verifies configuration validation and restart persistence, cutoff boundaries, positive-balance/frozen/organization exclusions, bounded large-account previews, and no-change preview/journal inspection. Common tests passed with 35 tests and zero failures; packaged Forge and NeoForge dedicated-server smoke checks both passed with the vanilla-client reconnect probe. Actual cleanup, deletion, scheduler work, compaction, balance forfeiture, and Phase 6 work remain excluded.
+
+## P05 implementation record
+
+**P05 verification: PASS. Phase 6 is not authorized.**
+
+P05 adds disabled-by-default flat or rounded-percentage fees, durable fee reserve accounting, server-generated payment previews, single-use expiring confirmation nonces, and `/scrip confirm` fallback. Preview and confirmation bind actor, source, recipient, amount, fee, policy revision, and expiry, then revalidate authorization and balance at settlement. No loan, interest, transfer-limit, combined-fee, GUI, or shop handling was added.

@@ -9,6 +9,8 @@ import com.gogleox.scrip.maintenance.JournalMaintenancePreview;
 import com.gogleox.scrip.maintenance.MaintenanceConfiguration;
 import com.gogleox.scrip.maintenance.MaintenanceExclusion;
 import com.gogleox.scrip.maintenance.MaintenancePreview;
+import com.gogleox.scrip.payment.PaymentPreview;
+import com.gogleox.scrip.payment.PaymentResult;
 import com.mojang.logging.LogUtils;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
@@ -66,6 +68,7 @@ public final class ScripCommandRegistrar {
                                 .requires(source -> source.hasPermission(ADMIN_PERMISSION)).executes(this::otherBalance)))
                 .then(Commands.literal("pay").then(Commands.argument("player", GameProfileArgument.gameProfile())
                         .then(Commands.argument("amount", LongArgumentType.longArg(1)).executes(this::pay))))
+                .then(Commands.literal("confirm").then(Commands.argument("nonce", StringArgumentType.word()).executes(this::confirmPayment)))
                 .then(Commands.literal("history").executes(this::history))
                 .then(admin));
     }
@@ -163,10 +166,13 @@ public final class ScripCommandRegistrar {
         try { sender = context.getSource().getPlayerOrException(); } catch (Exception exception) { return failure(context, "This command requires a player."); }
         Optional<Target> target = target(context); if (target.isEmpty()) return failure(context, "Unknown player account.");
         Optional<CommandService> service = commands.get(); if (service.isEmpty()) return failure(context, "Scrip is not ready.");
-        long amount = LongArgumentType.getLong(context, "amount");
-        TransferOutcome outcome = service.get().pay(sender.getUUID(), target.get().id(), amount, UUID.randomUUID());
-        if (outcome.status() == TransferOutcome.Status.SUCCESS) return success(context, "Paid " + target.get().name() + " " + amount + " Coins.");
-        return failure(context, transferFailure(outcome));
+        long amount = LongArgumentType.getLong(context, "amount"); PaymentResult result=service.get().previewPersonalPayment(sender.getUUID(),target.get().id(),amount);
+        if(result.status()!=PaymentResult.Status.PREVIEW_READY)return failure(context,"Payment preview failed: "+result.status().name().toLowerCase()+"."); PaymentPreview preview=result.preview().orElseThrow();
+        if(preview.confirmationRequired())return success(context,"Payment preview: amount="+amount+", fee="+preview.fee()+", total="+preview.totalDebit()+". Confirm with /scrip confirm "+preview.nonce());
+        PaymentResult executed=service.get().executePreview(sender.getUUID(),preview);return executed.status()==PaymentResult.Status.EXECUTED?success(context,"Paid "+target.get().name()+" "+amount+" Coins; fee="+preview.fee()+"."):failure(context,"Payment failed: "+executed.status().name().toLowerCase()+".");
+    }
+    private int confirmPayment(CommandContext<CommandSourceStack> context) {
+        ServerPlayer player;try{player=context.getSource().getPlayerOrException();}catch(Exception exception){return failure(context,"This command requires a player.");} Optional<CommandService> service=commands.get();if(service.isEmpty())return failure(context,"Scrip is not ready.");try{PaymentResult result=service.get().confirmPayment(player.getUUID(),UUID.fromString(StringArgumentType.getString(context,"nonce")));return result.status()==PaymentResult.Status.EXECUTED?success(context,"Payment confirmed."):failure(context,"Confirmation failed: "+result.status().name().toLowerCase()+".");}catch(IllegalArgumentException exception){return failure(context,"Invalid confirmation nonce.");}
     }
     private int history(CommandContext<CommandSourceStack> context) {
         ServerPlayer player;
