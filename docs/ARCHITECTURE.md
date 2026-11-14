@@ -44,6 +44,16 @@ Administrative operations live beneath `/scrip admin`: `balance`, `grant`, `dedu
 
 Frozen accounts cannot originate transfers, though their balances can still receive a server-authorized administrative correction. No command writes balance state directly. Optional aliases come from the bounded `scrip.command.aliases` JVM property; invalid labels are ignored, collisions are logged and skipped, and neither aliases nor the `/scrip` root overwrite another registered command. Commands use only server text feedback and require no client-side mod or payload.
 
+## Implemented in P04
+
+The common `AccountLedger` now owns durable organization state alongside personal accounts. Each organization receives a random stable organization ID, a distinct organization account ID, one permanent active owner, a bounded name, memberships, and pending invitations. An organization account is never an alias for its owner's personal account.
+
+Membership roles are fixed: members can inspect their organization and deposit their own funds; managers can also invite or remove ordinary members and spend organization funds; owners alone can promote or demote managers. Every authorization check happens in the server-side ledger before a transition is journaled. Direct generic transfers involving an organization account are rejected, so callers cannot bypass role checks by supplying an account ID.
+
+Personal deposits and authorized organization spending call the same atomic transfer path used by personal payments. Organization membership transitions and their administrative audit records are durable journal operations replayed at restart. Account-access lists are derived from current membership for future GUI selection, but account selection grants no authority and every action is re-authorized.
+
+Ownership transfer deliberately performs no mutation and reports a policy-unresolved result. Organization dissolution, automatic deletion, custom permissions, loans, interest, taxes, and shops remain outside P04. This preserves the owner-to-account binding and prevents orphaned organization balances until an explicit succession or dissolution policy is approved.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

@@ -1,7 +1,8 @@
 # $crip | Implementation Status
 
 **Product:** `$crip` / technical ID `scrip` / in-game default currency `Coins` (unchanged).
-**P03 authoritative update (2026-11-13):** P03 PASS. Server-side player and administrative commands, durable administrative audit, and frozen-account enforcement are verified. Do not begin Phase 4 without explicit authorization.
+**P03 authoritative update (2026-11-13):** P03 PASS. Server-side player and administrative commands, durable administrative audit, and frozen-account enforcement are verified.
+**P04 authoritative update (2026-11-13):** P04 organization banking implementation is complete and verified. Do not begin Phase 5 without explicit authorization.
 **Current:** P01 PASS — durable journal and checkpoint feasibility proven with injected storage faults. No account or economy service implemented.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** P02 account service and atomic ledger.
@@ -63,3 +64,11 @@ The command tree supplies `/scrip balance`, `/scrip balance <player>`, `/scrip p
 Aliases use the bounded `scrip.command.aliases` JVM property. Conflicting commands are left untouched and reported as warnings. No GUI, HUD, organization banking, confirmation flow, rewards, cleanup execution, or journal compaction was introduced.
 
 Verified locally on Java 21 (2026-11-13): common tests passed with 29 tests and zero failures after applying the documented local loopback transport override. The full build and artifact verification compiled both loader command adapters and passed. Production dedicated-server smoke checks for Forge and NeoForge each reached readiness, shut down cleanly, and completed two vanilla-client reconnects with no client mod installed. A development Forge run remains blocked by a local ModLauncher `jopt.simple` module-resolution fault; the packaged Forge dedicated-server check passed.
+
+## P04 implementation record
+
+**P04 verification: PASS. Phase 5 is not authorized.**
+
+Organization creation, owner assignment, invitations, acceptance, deposits, manager spending, membership changes, role boundaries, direct-API authorization rejection, restart replay, failed-transfer consistency, and concurrent organization payments are covered by common tests. Organizations are immutable with respect to ownership transfer and dissolution in this packet: the owner cannot be removed or demoted, and an ownership-transfer request returns a documented policy blocker without state change.
+
+P04 adds no GUI, custom permissions, loans, interest, taxation, shop inventory, or automatic organization deletion. Common tests passed with 32 tests and zero failures. Forge and NeoForge P04 artifacts both passed build verification and packaged dedicated-server smoke checks, including the vanilla-client reconnect probe.

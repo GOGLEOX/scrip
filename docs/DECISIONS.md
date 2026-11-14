@@ -74,3 +74,11 @@
 - Administrative commands require server permission level 2. The command adapter derives the acting player identity from the authenticated command source; non-player administrative execution records the fixed `console` principal.
 - P03 introduces durable `admin-adjust` and `account-freeze` journal operations rather than any command-owned balance or freeze state. Administrative audit history is bounded to 1,000 newest records. This does not authorize maintenance cleanup, compaction, organization banking, or integration rewards.
 - Aliases are bounded, opt-in server startup configuration through `scrip.command.aliases`. Invalid labels, the protected `scrip` label, duplicates, and existing root-command collisions cannot replace another mod command; collisions produce a server warning.
+
+## P04 organization banking | 2026-11-13
+
+- Organization IDs and their account IDs are independently generated UUIDs. Organization balances are ledger-owned assets and are never derived from, inherited by, or swept to an owner's personal account.
+- P04 has exactly three fixed roles: `OWNER`, `MANAGER`, and `MEMBER`. The ledger enforces all role checks itself; external callers and future clients may request an action but cannot provide or select their own authority.
+- Generic `transfer` rejects organization endpoints. Only `depositToOrganization` and `spendOrganizationFunds` can reach an organization account, and each checks durable membership immediately before invoking the same atomic transfer engine.
+- Creation, invitation, acceptance, removal, and role changes are forced journal operations with a bounded organization administrative audit. The sole owner cannot be removed or demoted, preventing an orphaned active organization account.
+- Ownership succession and organization dissolution remain explicitly unresolved. P04 validates a transfer request but returns `POLICY_UNRESOLVED` without persisting a role or balance change. No irreversible fallback is authorized.

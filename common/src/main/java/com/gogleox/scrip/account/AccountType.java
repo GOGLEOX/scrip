@@ -1,6 +1,6 @@
 package com.gogleox.scrip.account;
 
-/** Account categories. Organization behavior is reserved for a later phase. */
+/** Account categories owned by the server ledger. */
 public enum AccountType {
     PERSONAL,
     ORGANIZATION
