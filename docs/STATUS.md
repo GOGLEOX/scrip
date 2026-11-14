@@ -3,11 +3,12 @@
 **Product:** `$crip` / technical ID `scrip` / in-game default currency `Coins` (unchanged).
 **P03 authoritative update (2026-11-13):** P03 PASS. Server-side player and administrative commands, durable administrative audit, and frozen-account enforcement are verified.
 **P04 authoritative update (2026-11-13):** P04 organization banking implementation is complete and verified.
-**P03-M authoritative update (2026-11-14):** P03-M administrative maintenance configuration and read-only inspection controls are complete and verified. Do not begin Phase 6.
-**P05 authoritative update (2026-11-14):** P05 fees and server-authoritative payment confirmations are complete and verified. Do not begin Phase 6.
-**Current:** P01 PASS — durable journal and checkpoint feasibility proven with injected storage faults. No account or economy service implemented.
+**P03-M authoritative update (2026-11-14):** P03-M administrative maintenance configuration and read-only inspection controls are complete and verified.
+**P05 authoritative update (2026-11-14):** P05 fees and server-authoritative payment confirmations are complete and verified.
+**P06 authoritative update (2026-11-14):** P06 gameplay reward and starter-grant foundation is complete and verified. Do not begin P07.
+**Current:** P06 PASS — server-authoritative reward and starter-grant foundation verified. P07 is not authorized.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
-**Next permitted packet:** P02 account service and atomic ledger.
+**Next permitted packet:** P07 compatibility adapters, only after explicit authorization.
 **Approved backend:** Durable in-memory snapshot + append-only forced journal (ADR-0001 ACCEPTED); SQLite not in v1.  
 **Approved maintenance scope:** Configurable automatic stale-account cleanup and admin preview/run/status/config, journal compact/verify (ADR-0002).  
 **Named integrations:** Serilum Starter Kit Forge+NeoForge, FTB Quests NeoForge 1.21.1, future first-party GOGLEOX shop hook both, ChunkLock objective and generic bridge.
@@ -85,6 +86,14 @@ Maintenance regression coverage verifies configuration validation and restart pe
 
 ## P05 implementation record
 
-**P05 verification: PASS. Phase 6 is not authorized.**
+**P05 verification: PASS.**
 
 P05 adds disabled-by-default flat or rounded-percentage fees, durable fee reserve accounting, server-generated payment previews, single-use expiring confirmation nonces, and `/scrip confirm` fallback. Preview and confirmation bind actor, source, recipient, amount, fee, policy revision, and expiry, then revalidate authorization and balance at settlement. No loan, interest, transfer-limit, combined-fee, GUI, or shop handling was added.
+
+## P06 implementation record
+
+**P06 verification: PASS. Do not begin P07.**
+
+P06 adds durable, disabled-by-default configuration for advancement, verified mob-kill, conservative mining, observed active-playtime, and optional external quest/job reward sources. Issuance is ledger-owned and atomic with its source record and permanent one-time claim. Starter grants are UUID-claimed, default to zero, and support mutually exclusive first-join and future starter-kit trigger modes. First-join processing runs after the server has registered a verified player account; kit mode withholds payment until a compatible trusted trigger is supplied.
+
+Verification on Java 21: `:common:test` passed 40 tests with zero failures; `build verifyArtifacts` passed and verified the Forge and NeoForge P06 jars; packaged Forge and NeoForge dedicated-server smoke checks each reached readiness and passed the vanilla protocol reconnect probe without a client mod. Common tests cover duplicate advancement prevention, invalid kill and placement-derived mining exclusion, interval playtime issuance, disabled categories, starter triggers, duplicate grant prevention, restart replay, and rename-safe UUID claims. No FTB Quests or Serilum adapter, GUI, jobs system, shop functionality, or P07 work is included.

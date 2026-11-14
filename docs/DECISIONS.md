@@ -96,3 +96,10 @@
 - A durable non-spendable fee reserve records collected fees so payment settlement conserves value without choosing the pending burn-versus-treasury policy.
 - Confirmations are server-generated, memory-resident, single-use previews. They are not persisted or client-created; a crash safely requires a new preview while any committed payment is recovered from the journal.
 - The confirmation threshold is 2,000 Coins based only on payment amount. Policy revision changes, account lifecycle changes, organization-role changes, balance changes, expiration, and nonce reuse invalidate final settlement.
+
+## P06 gameplay rewards and starter grants | 2026-11-14
+
+- Reward configuration and issuance belong to the durable account ledger. A reward credit and its permanent one-time claim, when required, are one forced journal operation; claims remain outside maintenance and compaction policy.
+- Every reward source defaults to disabled. Rewards use nonnegative whole currency units; a zero amount cannot create a claim. The initial allowance defaults to zero and supports `FIRST_JOIN` or `STARTER_KIT`, with the selected mode as the sole eligible trigger.
+- Gameplay adapters must submit server-observed eligibility facts. The reward domain never accepts client assertions. A generic optional external-source contract is provided, but concrete FTB Quests and Serilum adapters remain P07 work and are not inferred from undocumented APIs.
+- Active playtime is measured by a bounded scheduler-owned accumulator, not a per-player tick-time ledger write. AFK observation remains a loader integration responsibility; unobserved/inactive seconds must not be submitted.

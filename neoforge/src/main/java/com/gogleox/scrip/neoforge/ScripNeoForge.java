@@ -37,7 +37,7 @@ public final class ScripNeoForge {
     }
 
     private void serverStarted(ServerStartedEvent event) {
-        LOGGER.info("Scrip P03 server ready (NeoForge); currency default: {}", Scrip.DEFAULT_CURRENCY);
+        LOGGER.info("Scrip P06 server ready (NeoForge); currency default: {}", Scrip.DEFAULT_CURRENCY);
     }
 
     private void serverStopping(ServerStoppingEvent event) {
@@ -47,6 +47,7 @@ public final class ScripNeoForge {
     private void playerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (commands == null || !(event.getEntity() instanceof ServerPlayer player)) return;
         ledger.registerPlayer(player.getUUID(), player.getGameProfile().getName()).toCompletableFuture().join();
+        commands.playerJoined(player.getUUID());
     }
 
     private void registerCommands(RegisterCommandsEvent event) {

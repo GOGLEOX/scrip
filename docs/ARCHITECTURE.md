@@ -68,6 +68,12 @@ Fees enter a durable non-spendable fee reserve, preserving ledger value without 
 
 `/scrip pay` displays amount, fee, and total debit. Payments at or above 2,000 Coins require `/scrip confirm <nonce>`; lower payments execute after the same server-side preview and revalidation. No client payload or GUI is required.
 
+## Implemented in P06
+
+P06 adds a ledger-owned `RewardConfiguration`, disabled-by-default whole-unit payouts, and an atomic `reward-issuance` journal operation. The operation records source, target, amount, optional permanent claim identifier, and account mutation together, so replay cannot retain a one-time claim without its issued balance. Starter grants use the permanent UUID-based `starter:<player UUID>` claim and are therefore rename-, reconnect-, restart-, reactivation-, and journal-replay-safe.
+
+`RewardService` is server-side only. Its advancement, kill, mining, playtime, and external entry points accept server-validated facts; it never consumes a client-selected source, amount, or target. The playtime accumulator is bounded, accepts observed active seconds only, and emits at most one scheduled interval payout per call instead of writing on every tick. Mining requires a verified natural, non-recently-placed block; kill rewards require a verified eligible server kill. Optional integrations are represented only by `ExternalRewardSource`; no loader-specific FTB Quests or Serilum calls exist in this packet.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

@@ -11,6 +11,8 @@ import com.gogleox.scrip.account.TransactionRecord;
 import com.gogleox.scrip.ledger.AccountLedger;
 import com.gogleox.scrip.payment.PaymentResult;
 import com.gogleox.scrip.payment.PaymentService;
+import com.gogleox.scrip.reward.RewardService;
+import com.gogleox.scrip.reward.StarterGrantMode;
 import com.gogleox.scrip.maintenance.JournalMaintenancePreview;
 import com.gogleox.scrip.maintenance.MaintenanceConfiguration;
 import com.gogleox.scrip.maintenance.MaintenancePreview;
@@ -23,8 +25,10 @@ import java.util.UUID;
 public final class CommandService {
     private final AccountLedger ledger;
     private final PaymentService payments;
+    private final RewardService rewards;
 
-    public CommandService(AccountLedger ledger) { this.ledger = ledger; this.payments=new PaymentService(ledger); }
+    public CommandService(AccountLedger ledger) { this.ledger = ledger; this.payments=new PaymentService(ledger); this.rewards=new RewardService(ledger); }
+    public void playerJoined(UUID playerId) { rewards.starterGrant(playerId, StarterGrantMode.FIRST_JOIN); }
     public Optional<AccountSnapshot> balance(UUID playerId) { return ledger.findPersonal(playerId); }
     public Optional<AccountSnapshot> balanceByVerifiedPlayer(UUID playerId) { return ledger.findPersonal(playerId); }
     public TransferOutcome pay(UUID senderId, UUID recipientId, long amount, UUID operationId) {
