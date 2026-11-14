@@ -25,6 +25,13 @@ public final class PaymentService {
         TransferOutcome outcome=ledger.executePayment(UUID.randomUUID(),actor,preview.source(),preview.destination(),preview.amount(),preview.fee(),preview.policyRevision()).toCompletableFuture().join();return PaymentResult.of(map(outcome),preview);
     }
     public synchronized PaymentResult executeWithoutConfirmation(UUID actor,PaymentPreview preview) { if(preview.confirmationRequired())return PaymentResult.of(PaymentResult.Status.CONFIRMATION_REQUIRED,preview);return confirm(actor,preview.nonce()); }
+    /** API path: consumes the server-created preview and returns the durable transfer outcome. */
+    public synchronized TransferOutcome executeAuthorizedPreview(UUID actor, PaymentPreview preview) {
+        Objects.requireNonNull(preview,"preview"); PaymentPreview stored=pending.remove(preview.nonce());
+        if(stored==null||!stored.equals(preview)||!stored.actorId().equals(actor)||!clock.instant().isBefore(stored.expiresAt())) return TransferOutcome.rejected(TransferOutcome.Status.UNAUTHORIZED,preview.nonce());
+        if(ledger.paymentPolicy().revision()!=stored.policyRevision()) return TransferOutcome.rejected(TransferOutcome.Status.POLICY_CHANGED,preview.nonce());
+        return ledger.executePayment(UUID.randomUUID(),actor,stored.source(),stored.destination(),stored.amount(),stored.fee(),stored.policyRevision()).toCompletableFuture().join();
+    }
     private void expire(){Instant now=clock.instant();pending.entrySet().removeIf(entry->!now.isBefore(entry.getValue().expiresAt()));}
     private static PaymentResult.Status map(TransferOutcome outcome){return switch(outcome.status()){case SUCCESS->PaymentResult.Status.EXECUTED;case INSUFFICIENT_FUNDS->PaymentResult.Status.INSUFFICIENT_FUNDS;case FROZEN_ACCOUNT->PaymentResult.Status.FROZEN;case POLICY_CHANGED->PaymentResult.Status.POLICY_CHANGED;case UNAUTHORIZED->PaymentResult.Status.UNAUTHORIZED;case UNKNOWN_ACCOUNT->PaymentResult.Status.UNKNOWN_ACCOUNT;case STORAGE_FAILURE->PaymentResult.Status.STORAGE_FAILURE;default->PaymentResult.Status.INVALIDATED;};}
 }

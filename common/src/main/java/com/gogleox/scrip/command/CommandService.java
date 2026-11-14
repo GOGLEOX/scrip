@@ -16,6 +16,7 @@ import com.gogleox.scrip.reward.StarterGrantMode;
 import com.gogleox.scrip.maintenance.JournalMaintenancePreview;
 import com.gogleox.scrip.maintenance.MaintenanceConfiguration;
 import com.gogleox.scrip.maintenance.MaintenancePreview;
+import com.gogleox.scrip.api.*;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -26,8 +27,10 @@ public final class CommandService {
     private final AccountLedger ledger;
     private final PaymentService payments;
     private final RewardService rewards;
+    private final TrustedRewardSourceRegistry trustedRewardSources;
+    private final DefaultEconomyService economy;
 
-    public CommandService(AccountLedger ledger) { this.ledger = ledger; this.payments=new PaymentService(ledger); this.rewards=new RewardService(ledger); }
+    public CommandService(AccountLedger ledger) { this.ledger = ledger; this.payments=new PaymentService(ledger); this.rewards=new RewardService(ledger); this.trustedRewardSources=new TrustedRewardSourceRegistry();this.trustedRewardSources.register(new TrustedRewardSource("command",100_000,true));this.economy=new DefaultEconomyService(ledger,trustedRewardSources,ignored->false); }
     public void playerJoined(UUID playerId) { rewards.starterGrant(playerId, StarterGrantMode.FIRST_JOIN); }
     public Optional<AccountSnapshot> balance(UUID playerId) { return ledger.findPersonal(playerId); }
     public Optional<AccountSnapshot> balanceByVerifiedPlayer(UUID playerId) { return ledger.findPersonal(playerId); }
@@ -51,4 +54,6 @@ public final class CommandService {
     public MaintenanceConfiguration updateMaintenanceConfiguration(UUID operationId, MaintenanceConfiguration configuration) { return ledger.updateMaintenanceConfiguration(operationId,configuration).toCompletableFuture().join(); }
     public MaintenancePreview previewMaintenance(int inactivityDays, Collection<UUID> onlinePlayers) { return ledger.previewMaintenance(inactivityDays,onlinePlayers); }
     public JournalMaintenancePreview journalMaintenancePreview() { return ledger.journalMaintenancePreview(); }
+    /** Command adapter has already authenticated an administrator; only allow registered command-enabled sources. */
+    public IntegrationRewardResponse integrationReward(String source,String claimId,UUID recipient,long amount) { return trustedRewardSources.find(source).filter(TrustedRewardSource::commandAllowed).map(ignored->economy.issueReward(new IntegrationRewardRequest(source,claimId,recipient,amount)).toCompletableFuture().join()).orElseGet(()->new IntegrationRewardResponse(IntegrationRewardResponse.Status.UNAUTHORIZED_SOURCE,null,java.util.OptionalLong.empty())); }
 }

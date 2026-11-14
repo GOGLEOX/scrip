@@ -1,6 +1,14 @@
 # $crip | Integration Contracts (Design Only)
 
-**Scope:** Minecraft 1.21.1, Java 21, Forge+NeoForge runtime core. This document records API design, NOT compiled code.
+**Scope:** Minecraft 1.21.1, Java 21, Forge+NeoForge runtime core.
+
+## P07-A implemented contract
+
+`com.gogleox.scrip.api.EconomyService` is the stable, loader-independent version-1 contract. It exposes immutable UUID/account-ID request and response objects through `CompletionStage`; it never exposes `AccountLedger`, journal storage, or mutable account state. It supports personal/account lookup, organization lookup, bounded history, authorization checks, payment preview/execution, administrator-gated adjustments, and trusted integration reward issuance. `EconomyPostCommitEvent` listeners run only after the underlying forced journal operation has returned a durable receipt.
+
+`TrustedRewardSourceRegistry` is server-owned. An unregistered source, a source over its configured maximum amount, an invalid claim, or an unknown recipient is rejected. Integration reward replay stores the source, claim ID, recipient, amount, durable operation ID, and sequence as one journal operation: an identical retry returns `DUPLICATE`; a changed recipient or amount returns `CONFLICT`, including after restart.
+
+The restricted command bridge is `/scrip integration reward <source> <claim-id> <player> <amount>`. It requires server permission level 2 and accepts only a command-enabled registered source. P07-A provides the bounded built-in `command` source; future optional adapters must register their own server-owned source and do not gain journal access.
 
 ## 1. Trust boundary
 - Only logical server code can authorize balance-changing operations.

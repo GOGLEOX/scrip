@@ -70,6 +70,7 @@ public final class ScripCommandRegistrar {
                         .then(Commands.argument("amount", LongArgumentType.longArg(1)).executes(this::pay))))
                 .then(Commands.literal("confirm").then(Commands.argument("nonce", StringArgumentType.word()).executes(this::confirmPayment)))
                 .then(Commands.literal("history").executes(this::history))
+                .then(integration().requires(source -> source.hasPermission(ADMIN_PERMISSION)))
                 .then(admin));
     }
 
@@ -102,6 +103,18 @@ public final class ScripCommandRegistrar {
                         .then(Commands.literal("preview").executes(this::journalPreview))
                         .then(Commands.literal("run").executes(this::notImplemented)))
                 .then(Commands.literal("verify").executes(this::journalVerify));
+    }
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> integration() {
+        return Commands.literal("integration").then(Commands.literal("reward")
+                .then(Commands.argument("source",StringArgumentType.word())
+                        .then(Commands.argument("claim-id",StringArgumentType.word())
+                                .then(Commands.argument("player",GameProfileArgument.gameProfile())
+                                        .then(Commands.argument("amount",LongArgumentType.longArg(1)).executes(this::integrationReward))))));
+    }
+    private int integrationReward(CommandContext<CommandSourceStack> context) {
+        Optional<Target> target=target(context);if(target.isEmpty())return failure(context,"Unknown player account.");Optional<CommandService> service=commands.get();if(service.isEmpty())return failure(context,"Scrip is not ready.");
+        try { var result=service.get().integrationReward(StringArgumentType.getString(context,"source"),StringArgumentType.getString(context,"claim-id"),target.get().id(),LongArgumentType.getLong(context,"amount")); return switch(result.status()){case ISSUED->success(context,"Integration reward issued.");case DUPLICATE->success(context,"Integration reward was already issued.");case CONFLICT->failure(context,"Claim identifier conflicts with an existing reward.");case LIMIT_EXCEEDED->failure(context,"Reward amount exceeds the source limit.");case UNAUTHORIZED_SOURCE->failure(context,"Integration reward source is not authorized.");case UNKNOWN_PLAYER->failure(context,"Unknown player account.");default->failure(context,"Integration reward rejected: "+result.status().name().toLowerCase()+".");}; }
+        catch(IllegalArgumentException exception){return failure(context,"Invalid integration reward request.");}
     }
 
     private int cleanupStatus(CommandContext<CommandSourceStack> context) {

@@ -74,6 +74,12 @@ P06 adds a ledger-owned `RewardConfiguration`, disabled-by-default whole-unit pa
 
 `RewardService` is server-side only. Its advancement, kill, mining, playtime, and external entry points accept server-validated facts; it never consumes a client-selected source, amount, or target. The playtime accumulator is bounded, accepts observed active seconds only, and emits at most one scheduled interval payout per call instead of writing on every tick. Mining requires a verified natural, non-recently-placed block; kill rewards require a verified eligible server kill. Optional integrations are represented only by `ExternalRewardSource`; no loader-specific FTB Quests or Serilum calls exist in this packet.
 
+## Implemented in P07-A
+
+The public API is `EconomyService` version 1 in the loader-neutral common module. It returns immutable values through `CompletionStage`, accepts UUID identities and typed account IDs, and delegates every mutation to the existing payment or ledger transaction boundary. API consumers receive account/organization views and bounded history, never a ledger or storage reference. Authorization is derived from durable personal ownership and organization roles; administrative adjustment requires a host-supplied server authorization policy.
+
+Trusted integration rewards have a separate durable idempotency tuple rather than a best-effort claim marker. Source, claim ID, recipient, amount, operation ID, and durable sequence replay together. Post-commit listeners run only after the operation is durable. The administrative command bridge has no client path and accepts only registered command-enabled sources with bounded issue limits. No third-party integration API is loaded or called.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

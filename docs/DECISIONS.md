@@ -103,3 +103,9 @@
 - Every reward source defaults to disabled. Rewards use nonnegative whole currency units; a zero amount cannot create a claim. The initial allowance defaults to zero and supports `FIRST_JOIN` or `STARTER_KIT`, with the selected mode as the sole eligible trigger.
 - Gameplay adapters must submit server-observed eligibility facts. The reward domain never accepts client assertions. A generic optional external-source contract is provided, but concrete FTB Quests and Serilum adapters remain P07 work and are not inferred from undocumented APIs.
 - Active playtime is measured by a bounded scheduler-owned accumulator, not a per-player tick-time ledger write. AFK observation remains a loader integration responsibility; unobserved/inactive seconds must not be submitted.
+
+## P07-A public economy API | 2026-11-14
+
+- `EconomyService` version 1 is the sole public integration boundary. It is Java 21 and loader-neutral, immutable at its inputs/outputs, asynchronous at its public operations, and contains no mutable ledger/storage exposure.
+- Trusted reward source IDs are explicitly registered by server-owned bootstrap code and have a positive maximum issue amount. The command bridge is operator-restricted and can use only sources marked command-enabled.
+- Integration reward idempotency persists the entire request identity. Same source/claim/recipient/amount is a replay-safe duplicate; a reused source/claim with different recipient or amount is a conflict. Events are emitted only after the forced operation returns.
