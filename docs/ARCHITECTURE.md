@@ -26,6 +26,14 @@ Recovery validates a checkpoint manifest and its versioned snapshot before repla
 
 Checkpoints write and force a new versioned snapshot file, validate it, then replace a forced and verified manifest. The preceding checkpoint file stays on disk as a recovery anchor. P01 does not delete or compact journal entries; P10 owns segment retirement after a verified recovery process.
 
+## Implemented in P02
+
+`AccountLedger` is the common server-side account service. It owns indexed personal accounts keyed by stable player UUID, a known-player registry, account lookup, bounded account history, and permanent claim identifiers. A rename updates only the verified name record; it does not change account identity.
+
+Account opening, player activity, transfers, internal adjustments, claims, and reserved tombstones are typed immutable journal payloads replayed through `LedgerStore`. The world currency name is initialized once in the journal and must match on later opens. The account writer validates a transfer, commits its complete debit-and-credit intent as one operation, waits for the durable receipt, and then publishes both balance changes. Checked signed 64-bit arithmetic rejects negative balances and overflow. Exact operation retries return the original sequence; conflicting reuse is rejected. Each account retains its newest 100 records, independent of permanent claim retention.
+
+Organization account type and tombstone lifecycle forms are reserved in the shared domain model only. Organization behavior, rewards, fees, commands, GUI, shop behavior, and cleanup execution are not part of P02.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

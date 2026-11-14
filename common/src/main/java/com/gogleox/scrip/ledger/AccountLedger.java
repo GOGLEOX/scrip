@@ -1,0 +1,81 @@
+package com.gogleox.scrip.ledger;
+
+import com.gogleox.scrip.account.*;
+import com.gogleox.scrip.storage.*;
+
+import java.io.*;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.*;
+
+/** Server-side account state rebuilt solely from the durable journal. */
+public final class AccountLedger implements AutoCloseable {
+    private static final String INIT = "scrip:ledger-init.v1", PLAYER = "scrip:player.v1", ACCOUNT = "scrip:account.v1";
+    private static final String TRANSFER = "scrip:transfer.v1", ADJUST = "scrip:adjust.v1", CLAIM = "scrip:claim.v1", TOMBSTONE = "scrip:tombstone.v1";
+    private final LedgerStore store; private final Clock clock; private final ExecutorService writer;
+    private final Map<AccountId, State> accounts = new HashMap<>();
+    private final Map<UUID, AccountId> personal = new HashMap<>();
+    private final Map<UUID, KnownPlayer> players = new HashMap<>();
+    private final Map<String, UUID> names = new HashMap<>();
+    private final Map<UUID, Completed> operations = new HashMap<>();
+    private final Set<String> claims = new HashSet<>();
+    private CurrencyDefinition currency; private boolean closed;
+
+    public static AccountLedger open(Path directory, CurrencyDefinition currency) { return new AccountLedger(JournalFileLedgerStore.open(directory), currency, Clock.systemUTC()); }
+    public static AccountLedger open(LedgerStore store, CurrencyDefinition currency) { return new AccountLedger(store, currency, Clock.systemUTC()); }
+    AccountLedger(LedgerStore store, CurrencyDefinition requested, Clock clock) {
+        this.store = Objects.requireNonNull(store); this.clock = Objects.requireNonNull(clock);
+        this.writer = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "scrip-account-writer"); t.setDaemon(true); return t; });
+        recover(requested);
+    }
+    private void recover(CurrencyDefinition requested) {
+        RecoveryState state = store.recover();
+        if (state.snapshot().isPresent()) throw new StorageException("Account snapshots are not supported before checkpoint integration");
+        for (JournalEntry entry : state.entries()) replay(entry);
+        if (currency == null) { currency = requested; durable(new JournalOperation(UUID.randomUUID(), INIT, encode(out -> out.writeUTF(requested.displayName())))); }
+        else if (!currency.equals(requested)) throw new StorageException("World currency does not match its durable configuration");
+    }
+    public CurrencyDefinition currency() { synchronized (this) { return currency; } }
+    public CompletionStage<AccountSnapshot> registerPlayer(UUID playerId, String verifiedName) { return submit(() -> {
+        requireName(verifiedName); Instant now = clock.instant(); AccountId id = personal.get(playerId);
+        if (id == null) { AccountId created = new AccountId(playerId); durable(new JournalOperation(UUID.randomUUID(), ACCOUNT, encode(o -> { writeId(o,created); o.writeLong(playerId.getMostSignificantBits()); o.writeLong(playerId.getLeastSignificantBits()); writeTime(o,now); }))); applyAccount(created, playerId, now); id = created; }
+        String old = players.containsKey(playerId) ? players.get(playerId).lastKnownName() : null;
+        durable(new JournalOperation(UUID.randomUUID(), PLAYER, encode(o -> { o.writeLong(playerId.getMostSignificantBits()); o.writeLong(playerId.getLeastSignificantBits()); o.writeUTF(verifiedName); writeTime(o,now); })));
+        if (old != null) names.remove(key(old)); KnownPlayer known = new KnownPlayer(playerId, verifiedName, now); players.put(playerId, known); names.put(key(verifiedName), playerId);
+        State account = accounts.get(id); account.login = now; return snapshot(account);
+    }); }
+    public Optional<AccountSnapshot> findPersonal(UUID playerId) { synchronized(this) { return Optional.ofNullable(personal.get(playerId)).map(accounts::get).map(this::snapshot); } }
+    public Optional<AccountSnapshot> findAccount(AccountId id) { synchronized(this) { return Optional.ofNullable(accounts.get(id)).map(this::snapshot); } }
+    public Optional<KnownPlayer> findKnownPlayer(String name) { synchronized(this) { UUID id=names.get(key(name)); return Optional.ofNullable(id).map(players::get); } }
+    public List<TransactionRecord> history(AccountId id) { synchronized(this) { State s=accounts.get(id); return s==null ? List.of() : List.copyOf(s.history); } }
+    public CompletionStage<TransferOutcome> transfer(TransferRequest request) { return submit(() -> transferNow(request)); }
+    private TransferOutcome transferNow(TransferRequest r) {
+        Completed prior=operations.get(r.operationId()); if(prior!=null) return prior.matches(r) ? TransferOutcome.success(r.operationId(),prior.sequence,true) : TransferOutcome.rejected(TransferOutcome.Status.OPERATION_CONFLICT,r.operationId());
+        if(r.amount()<=0) return TransferOutcome.rejected(TransferOutcome.Status.INVALID_AMOUNT,r.operationId()); if(r.source().equals(r.destination())) return TransferOutcome.rejected(TransferOutcome.Status.SAME_ACCOUNT,r.operationId());
+        State from=accounts.get(r.source()), to=accounts.get(r.destination()); if(from==null||to==null) return TransferOutcome.rejected(TransferOutcome.Status.UNKNOWN_ACCOUNT,r.operationId()); if(from.lifecycle!=AccountLifecycle.ACTIVE||to.lifecycle!=AccountLifecycle.ACTIVE) return TransferOutcome.rejected(TransferOutcome.Status.ACCOUNT_TOMBSTONED,r.operationId()); if(from.balance<r.amount()) return TransferOutcome.rejected(TransferOutcome.Status.INSUFFICIENT_FUNDS,r.operationId());
+        try { Math.addExact(to.balance,r.amount()); } catch(ArithmeticException e) { return TransferOutcome.rejected(TransferOutcome.Status.DESTINATION_OVERFLOW,r.operationId()); }
+        Instant now=clock.instant(); CommitReceipt receipt;
+        try { receipt=durable(new JournalOperation(r.operationId(),TRANSFER,encode(o->{writeId(o,r.source());writeId(o,r.destination());o.writeLong(r.amount());writeTime(o,now);}))); } catch(RuntimeException e) { return TransferOutcome.rejected(TransferOutcome.Status.STORAGE_FAILURE,r.operationId()); }
+        from.balance-=r.amount(); to.balance+=r.amount(); from.activity=to.activity=now; add(from,new TransactionRecord(r.operationId(),now,TransactionDirection.OUTGOING,Optional.of(r.destination()),r.amount(),"transfer")); add(to,new TransactionRecord(r.operationId(),now,TransactionDirection.INCOMING,Optional.of(r.source()),r.amount(),"transfer")); operations.put(r.operationId(),new Completed(r,receipt.sequence())); return TransferOutcome.success(r.operationId(),receipt.sequence(),false);
+    }
+    public CompletionStage<TransferOutcome> adjust(AdjustmentRequest request) { return submit(() -> {
+        if(operations.containsKey(request.operationId())) return TransferOutcome.rejected(TransferOutcome.Status.OPERATION_CONFLICT,request.operationId()); State s=accounts.get(request.account()); if(s==null) return TransferOutcome.rejected(TransferOutcome.Status.UNKNOWN_ACCOUNT,request.operationId()); long next;
+        try { next=Math.addExact(s.balance,request.delta()); } catch(ArithmeticException e) { return TransferOutcome.rejected(TransferOutcome.Status.DESTINATION_OVERFLOW,request.operationId()); } if(next<0) return TransferOutcome.rejected(TransferOutcome.Status.INSUFFICIENT_FUNDS,request.operationId()); Instant now=clock.instant(); CommitReceipt receipt;
+        try { receipt=durable(new JournalOperation(request.operationId(),ADJUST,encode(o->{writeId(o,request.account());o.writeLong(request.delta());o.writeUTF(request.reason());writeTime(o,now);}))); } catch(RuntimeException e) { return TransferOutcome.rejected(TransferOutcome.Status.STORAGE_FAILURE,request.operationId()); }
+        s.balance=next;s.activity=now;add(s,new TransactionRecord(request.operationId(),now,TransactionDirection.ADJUSTMENT,Optional.empty(),Math.abs(request.delta()),request.reason()));operations.put(request.operationId(),new Completed(request,receipt.sequence()));return TransferOutcome.success(request.operationId(),receipt.sequence(),false);
+    }); }
+    public CompletionStage<Boolean> recordPermanentClaim(String claimId) { return submit(() -> { if(claimId==null||claimId.isBlank()||claimId.length()>256) throw new IllegalArgumentException("Invalid permanent claim identifier"); if(claims.contains(claimId)) return false; durable(new JournalOperation(UUID.randomUUID(),CLAIM,encode(o->o.writeUTF(claimId)))); claims.add(claimId); return true; }); }
+    public boolean hasPermanentClaim(String claimId) { synchronized(this) { return claims.contains(claimId); } }
+    private CommitReceipt durable(JournalOperation operation) { try { return store.commit(operation).toCompletableFuture().join(); } catch(CompletionException e) { throw new StorageException("Durable ledger commit failed",e.getCause()); } }
+    private <T> CompletionStage<T> submit(Callable<T> task) { CompletableFuture<T> result=new CompletableFuture<>(); synchronized(this){if(closed){result.completeExceptionally(new StorageException("Account ledger is closed"));return result;}} try { writer.execute(()->{try{result.complete(task.call());}catch(Throwable e){result.completeExceptionally(e);}}); } catch(RuntimeException e){result.completeExceptionally(e);} return result; }
+    private void replay(JournalEntry entry) { try(DataInputStream in=new DataInputStream(new ByteArrayInputStream(entry.operation().payload()))) { switch(entry.operation().type()) { case INIT -> { currency=new CurrencyDefinition(in.readUTF()); } case ACCOUNT -> { AccountId id=readId(in); UUID owner=new UUID(in.readLong(),in.readLong());applyAccount(id,owner,readTime(in)); } case PLAYER -> { UUID id=new UUID(in.readLong(),in.readLong());String n=in.readUTF();Instant t=readTime(in);KnownPlayer prior=players.put(id,new KnownPlayer(id,n,t));if(prior!=null)names.remove(key(prior.lastKnownName()));names.put(key(n),id);State s=accounts.get(personal.get(id));if(s!=null)s.login=t; } case TRANSFER -> replayTransfer(entry.sequence(),entry.operation().operationId(),readId(in),readId(in),in.readLong(),readTime(in)); case ADJUST -> replayAdjust(entry.sequence(),entry.operation().operationId(),readId(in),in.readLong(),in.readUTF(),readTime(in)); case CLAIM -> claims.add(in.readUTF()); case TOMBSTONE -> { State s=accounts.get(readId(in));if(s==null)throw new StorageException("Tombstone references unknown account");s.lifecycle=AccountLifecycle.TOMBSTONED; } default -> throw new StorageException("Unknown account journal operation"); } if(in.available()!=0)throw new StorageException("Account journal operation has trailing bytes"); } catch(IOException|IllegalArgumentException e){throw new StorageException("Cannot replay account journal operation",e);} }
+    private void replayTransfer(long seq,UUID op,AccountId a,AccountId b,long amount,Instant at){ if(amount<=0||operations.containsKey(op))throw new StorageException("Invalid transfer replay");State from=need(a),to=need(b);if(from.balance<amount)throw new StorageException("Transfer replay overdraws account");try{to.balance=Math.addExact(to.balance,amount);}catch(ArithmeticException e){throw new StorageException("Transfer replay overflows account",e);}from.balance-=amount;from.activity=to.activity=at;add(from,new TransactionRecord(op,at,TransactionDirection.OUTGOING,Optional.of(b),amount,"transfer"));add(to,new TransactionRecord(op,at,TransactionDirection.INCOMING,Optional.of(a),amount,"transfer"));operations.put(op,new Completed(new TransferRequest(op,a,b,amount),seq));}
+    private void replayAdjust(long seq,UUID op,AccountId id,long delta,String reason,Instant at){State s=need(id);long next;try{next=Math.addExact(s.balance,delta);}catch(ArithmeticException e){throw new StorageException("Adjustment replay overflows account",e);}if(next<0||operations.containsKey(op))throw new StorageException("Invalid adjustment replay");s.balance=next;s.activity=at;add(s,new TransactionRecord(op,at,TransactionDirection.ADJUSTMENT,Optional.empty(),Math.abs(delta),reason));operations.put(op,new Completed(new AdjustmentRequest(op,id,delta,reason),seq));}
+    private void applyAccount(AccountId id,UUID owner,Instant at){if(accounts.containsKey(id)||personal.containsKey(owner))throw new StorageException("Duplicate personal account");State s=new State(id,owner,at);accounts.put(id,s);personal.put(owner,id);} private State need(AccountId id){State s=accounts.get(id);if(s==null)throw new StorageException("Journal references unknown account");return s;}
+    private AccountSnapshot snapshot(State s){return new AccountSnapshot(s.id,s.owner,AccountType.PERSONAL,new Balance(s.balance),s.created,s.login,s.activity,s.lifecycle);} private static void add(State s,TransactionRecord r){s.history.addFirst(r);while(s.history.size()>100)s.history.removeLast();} private static String key(String name){return name.toLowerCase(Locale.ROOT);} private static void requireName(String n){if(n==null||n.isBlank()||n.length()>16)throw new IllegalArgumentException("Invalid verified player name");}
+    private static byte[] encode(Encoder e){try{ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(DataOutputStream out=new DataOutputStream(bytes)){e.write(out);}return bytes.toByteArray();}catch(IOException x){throw new IllegalStateException(x);}} private static void writeId(DataOutputStream o,AccountId id)throws IOException{o.writeLong(id.value().getMostSignificantBits());o.writeLong(id.value().getLeastSignificantBits());}private static AccountId readId(DataInputStream i)throws IOException{return new AccountId(new UUID(i.readLong(),i.readLong()));}private static void writeTime(DataOutputStream o,Instant t)throws IOException{o.writeLong(t.toEpochMilli());}private static Instant readTime(DataInputStream i)throws IOException{return Instant.ofEpochMilli(i.readLong());}
+    @Override public void close(){synchronized(this){if(closed)return;closed=true;}writer.shutdown();try{if(!writer.awaitTermination(10,TimeUnit.SECONDS))throw new StorageException("Account writer did not stop cleanly");}catch(InterruptedException e){Thread.currentThread().interrupt();throw new StorageException("Interrupted while closing account writer",e);}store.close();}
+    private interface Encoder{void write(DataOutputStream out)throws IOException;} private static final class State{final AccountId id;final UUID owner;final Instant created;Instant login,activity;long balance;AccountLifecycle lifecycle=AccountLifecycle.ACTIVE;final Deque<TransactionRecord> history=new ArrayDeque<>();State(AccountId id,UUID owner,Instant at){this.id=id;this.owner=owner;created=login=activity=at;}} private record Completed(Object request,long sequence){boolean matches(TransferRequest r){return request.equals(r);}}
+}

@@ -42,3 +42,13 @@ P01 persistence format version 1 exists: framed journal operations plus verified
 
 ## Development handoff rules
 Record changed files, exact test commands/results, blockers, format/schema changes and next authorized packet. Do not invent test results. P01 is complete. P02 may define account operations and use `LedgerStore`; it must preserve the P01 force-before-acknowledgement boundary.
+
+## P02 implementation record
+
+**P02 verification: PASS. Next permitted packet: P03 commands and administrative controls.**
+
+`./gradlew.bat :common:test --no-daemon --console=plain` passed with 26 tests and zero failures. `./gradlew.bat build verifyArtifacts --no-daemon --console=plain` passed and verified both P02 jars. Packaged Forge and NeoForge dedicated-server probes both passed startup, clean shutdown, and two vanilla-client reconnects.
+
+P02 account-ledger code is present, but P02 is not yet verified. `AccountLedger` provides UUID-keyed personal accounts, durable verified-player registry entries, indexed account lookup, one world-local currency definition, lifecycle representation, bounded per-account history, permanent claim markers, and replay reconstruction. Transfers and internal adjustments use checked signed 64-bit arithmetic and a single serialized writer. A transfer becomes visible only after the journal receipt and carries its complete debit-and-credit intent in one operation. Exact operation retries are idempotent; conflicting reuse is rejected.
+
+New automated coverage defines account creation, restart, rename, valid and invalid transfers, overflow protection, duplicate-operation handling, concurrent transfer serialization, history rollover, permanent claims, and an injected force-boundary transfer failure. Common production and test sources compiled with Java 21, and the JUnit launcher executed 26 tests with 26 successes and zero failures. A separate manual Java 21 exercise created accounts, committed a transfer, retried its operation identifier, and reopened from the journal with the same balances. The Gradle test and build commands were also attempted after this change but could not start because the local Gradle launcher could not establish its loopback transport. Therefore no Gradle P02 test run, Forge build, NeoForge build, or dedicated-server startup is reported as passing. P02 verification is the only next permitted work; do not begin P03.

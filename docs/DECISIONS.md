@@ -58,3 +58,11 @@
 - Snapshot format version 1 and a checksummed checkpoint manifest are written through forced temporary files and published with atomic move where available, falling back to replacement move only when the platform cannot provide atomic move. Snapshot filenames carry their checkpoint sequence, so a previous verified snapshot remains available while a later checkpoint is prepared.
 - A torn final journal frame is quarantined by truncating only that incomplete tail and forcing the repaired file. Corruption in a complete record, snapshot, or manifest is an operator-visible storage failure; no empty ledger is created.
 - P01 adds no account, balance, claim, command, configuration, cleanup, or journal-deletion behavior. P10 remains responsible for backup, compaction and retention. P02 owns account operation payloads and transaction semantics.
+
+## P02 account and transaction decisions | 2026-11-13
+
+- Personal accounts use player UUID as the durable account identity. A verified name is a mutable registry attribute and is never an account key.
+- `AccountLedger` owns all balance changes and uses `LedgerStore` as its only persistence boundary. It validates a request, commits one immutable operation, waits for the durable receipt, then changes both in-memory balances together.
+- A transfer has a caller-supplied UUID operation identifier. Exact retries return the original receipt; reuse with different source, destination, or amount is rejected. Restart recovery rebuilds this information from the journal.
+- One named currency is established by the first durable account-ledger record for a world. Reopening with another name fails rather than silently changing currency semantics.
+- Account-facing history is capped at 100 entries. Permanent claim identifiers are separate durable state. Tombstone and organization type forms are represented without enabling later behavior.
