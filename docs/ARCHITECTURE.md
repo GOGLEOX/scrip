@@ -104,6 +104,12 @@ P07-E adds no shop code, dependencies, or wallet synchronization. Evidence-based
 
 Future adapters must isolate target classes by loader and optional discovery, then delegate all monetary authority through `ShopEconomyPort` (or an equally strict server-side provider contract). Shop UI, inventory mutation, stock, pricing, and delivery remain outside `$crip`.
 
+## Implemented in P07-F
+
+`TaxPaymentPort` version 1 is a loader-neutral, optional consumer boundary for a separate property-tax authority. A request carries only immutable financial facts: verified actor, typed source and recipient accounts, amount, stable invoice ID, stable period ID, and authenticated confirmation state. It does not represent claims, parcels, rates, billing schedules, grace, arrears, or penalties.
+
+The ledger commits a tax invoice identity, calculated fee, balance debit, recipient credit, and operation receipt as one forced journal entry. The durable invoice/period key rejects changed-payload reuse and makes exact retries safe through restart. Personal ownership, organization manager/owner authority, frozen lifecycle, fee-policy balance, and account existence are revalidated immediately before the commit. An absent or disabled tax authority has no effect on `$crip`; no ChunkLock class is referenced.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

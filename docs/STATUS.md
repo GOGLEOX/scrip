@@ -10,8 +10,9 @@
 **P07-B authoritative update (2026-11-14):** P07-B optional Serilum Starter Kit command bridge is complete. Exact Starter Kit+Collective binary-pair testing remains a release-matrix blocker.
 **P07-C authoritative update (2026-11-14):** P07-C optional FTB Quests NeoForge command bridge is complete. Exact FTB Quests binary-pair testing remains a release-matrix blocker.
 **P07-D authoritative update (2026-11-14):** P07-D first-party shop economy provider contract is complete and verified.
-**P07-E authoritative update (2026-11-14):** P07-E third-party shop research is complete. No candidate has a verified delegated-economy provider interface, so no adapter was implemented. Packaged-server smoke verification is blocked by a host loopback-selector failure before mod initialization. Stop after P07-E.
-**Current:** P07-E research complete; build/artifact verification PASS and packaged-server smoke blocked by the host networking environment. Stop after P07-E.
+**P07-E authoritative update (2026-11-14):** P07-E third-party shop research is complete. No candidate has a verified delegated-economy provider interface, so no adapter was implemented. Packaged-server smoke verification is blocked by a host loopback-selector failure before mod initialization.
+**P07-F authoritative update (2026-11-14):** P07-F optional ChunkLock tax-payment contract is complete. No compiled ChunkLock adapter is included because a compatible 1.21.1 artifact and public hook are unverified. Stop after P07-F.
+**Current:** P07-F contract complete; build/artifact verification PASS and packaged-server smoke remains host-networking blocked. Stop after P07-F.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** A separately authorized packet only.
 **Approved backend:** Durable in-memory snapshot + append-only forced journal (ADR-0001 ACCEPTED); SQLite not in v1.  
@@ -146,3 +147,13 @@ P07-E is a deliberately no-code result. Public release metadata and documented i
 All three are therefore **NOT SUPPORTED AS DIRECT ECONOMY ADAPTER**. $crip adds no hard dependency, reflection hook, external wallet mutation, mirrored database, or claimed buy/sell/refund behavior.
 
 Verification on Java 21: `:common:test --rerun-tasks` completed successfully with 50 tests and zero failures; `build verifyArtifacts` completed successfully and verified `0.1.0-p07-e` Forge and NeoForge artifacts. Packaged Forge and NeoForge dedicated-server smoke runs were both attempted with the new artifacts, but each failed before mod initialization while the JDK failed to establish its loopback selector connection. This is a shared host networking failure, not an observed loader or `$crip` exception; the packaged smoke and vanilla reconnect probes must be rerun in an environment with functional Java loopback selectors before release verification can be called complete.
+
+## P07-F implementation record
+
+**P07-F verification: contract complete; loader adapter blocked by missing compatible ChunkLock target. Stop after P07-F.**
+
+`TaxPaymentPort` provides immutable asynchronous payment requests and typed results without exposing the ledger. The ledger journals the invoice/period identity with the tax debit, fee, recipient credit, and stable operation ID in one durable operation. Identical invoice retries are durable duplicates; changed payload reuse is rejected. Personal and authorized organization sources, insufficient funds, frozen accounts, confirmation threshold, restart replay, disabled wiring, and missing ChunkLock classes are covered by the simulated consumer tests.
+
+Public research found only `chunklock-1.20.1-forge-v1.0.0.jar`; no Minecraft 1.21.1 ChunkLock artifact, loader target, or public integration hook has been verified. Accordingly, no ChunkLock dependency, reflection, event, command, claim, tax assessment, or enforcement code is present.
+
+Verification on Java 21: `:common:test --rerun-tasks` completed successfully with 53 tests and zero failures; `build verifyArtifacts` completed successfully and verified `0.1.0-p07-f` Forge and NeoForge artifacts. Packaged Forge and NeoForge dedicated-server smoke runs were both attempted with the new artifacts, but each stopped before mod initialization with the same JDK loopback-selector failure (`Unable to establish loopback connection`). The vanilla reconnect probes must be rerun where Java loopback selectors work before release verification is complete.

@@ -52,8 +52,15 @@ Durable states are `QUOTED`, `RESERVED`, `SETTLED`, `CANCELLED`, `REFUND_PENDING
 
 Payment confirmation remains server-authoritative: a confirmation-required quote cannot reserve without the authenticated server consumer declaring its buyer-confirmed step. A real shop must acquire that approval through its own server-side interaction; no client flag or inventory callback is trusted directly by $crip. A successful Coin debit is never inventory-delivery evidence, and there is no cross-system atomicity claim.
 
-## 6. Future ChunkLock
-- Optional tax debit and payout API, not direct storage or required $crip module. Specific ChunkLock loader and version must be pinned before implementation.
+## 6. ChunkLock tax-payment consumer contract
+
+P07-F implements `TaxPaymentPort` version 1 as an optional, loader-neutral economy consumer boundary. `TaxPaymentRequest` binds an authenticated payer actor, typed personal or organization source account, typed tax-recipient account, positive whole-unit amount, stable invoice ID, and stable tax-period ID. Claim/property identity, tax calculation, billing schedule, grace, arrears, and enforcement are intentionally absent: they remain ChunkLock responsibilities.
+
+`DefaultTaxPaymentPort` calls a dedicated ledger transaction that records the invoice identity and financial debit in one forced journal operation. The `(invoice ID, tax-period ID)` pair is durable and parameter-bound. An identical retry returns `DUPLICATE`; a reused pair with a changed actor, source, recipient, or amount returns `CONFLICT`, including after restart. The ledger revalidates current personal ownership or organization spend authority, account lifecycle, balance including the applicable fee, overflow, and destination before committing.
+
+Payments at the existing confirmation threshold require an authenticated server-side confirmation flag before a first debit. A duplicate remains observable even if retried without that flag. The result is typed (`PAID`, `DUPLICATE`, `CONFLICT`, `INSUFFICIENT_FUNDS`, `FROZEN_ACCOUNT`, `UNAUTHORIZED`, and related failures), so ChunkLock alone decides what unpaid-tax action, if any, follows.
+
+`DisabledTaxPaymentPort` is an explicit no-op wiring option. `$crip` loads no ChunkLock type, dependency, event, command, configuration, claim, or tax-policy code. A compiled adapter remains blocked until a compatible Minecraft 1.21.1 loader artifact and public server-side hook are pinned and verified.
 
 ## 7. Third-party shop adapter eligibility
 - A third-party shop is eligible only when its pinned target artifact documents a server-side external-provider boundary that delegates balance authority and has a recovery-safe settlement lifecycle. The adapter must retain `$crip` as the sole wallet and use `ShopEconomyPort` or an equivalently strict server-side boundary.

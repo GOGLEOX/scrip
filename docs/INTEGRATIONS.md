@@ -37,7 +37,9 @@ This file lists concrete sources selected for planning and desired user-facing b
 - Do not add a `/shop` feature to $crip now.
 
 ## Continuing: ChunkLock
-- Make taxes optional and server-owned; type/period/payer must be consistent and idempotent. Obtain actual ChunkLock code/API before claiming supported version.
+- P07-F supplies the optional loader-neutral `TaxPaymentPort` contract. A ChunkLock server can submit a verified payer actor, account choice, destination account, stable invoice/period identity, amount, and server-side confirmation; `$crip` returns a typed durable payment result.
+- `$crip` does not calculate tax, identify claims, schedule bills, enforce delinquency, or choose an unpaid-tax outcome. Those policies remain in ChunkLock.
+- No ChunkLock adapter is compiled. Public research found only `chunklock-1.20.1-forge-v1.0.0.jar`, not a Minecraft 1.21.1 target artifact or public tax hook. Pin and verify both before adding loader-specific discovery or calls.
 
 ## P07-E third-party shop research
 

@@ -130,5 +130,10 @@
 
 - Reject dual-wallet synchronization. A third-party shop may become an adapter target only when a pinned loader-specific artifact documents a server-authoritative external-provider boundary that lets `$crip` retain the sole balance ledger.
 - Money & Sign Shops `1.0.2`, Q Shop `1.8.5` for NeoForge 1.21.1, and SmartShopMode `1.8.0` for Forge/NeoForge 1.21.1 are **NOT SUPPORTED AS DIRECT ECONOMY ADAPTER** after public-interface review. No adapter, reflection hook, dependency, or mirrored store is permitted from this result.
+
+## P07-F ChunkLock tax payments | 2026-11-14
+
+- `TaxPaymentPort` version 1 is the optional money-only consumer boundary for a separate tax authority. Durable invoice/period idempotency, payer authorization, fees, freezing, organization spending authority, and atomic journal commit belong to `$crip`; all property and unpaid-tax policy belongs to ChunkLock.
+- Do not compile a ChunkLock adapter, add a dependency, or infer a public hook until a Minecraft 1.21.1 loader-specific artifact and server-side API are pinned and verified. Current public research found only a Forge 1.20.1 “Chunk Lock” release, which is not a supported target.
 - A reservation is durable state, not a balance lock. Settlement is the sole debit point and always revalidates current authorization, freeze state, balance, fee policy, and confirmation eligibility.
 - Payment, settlement state, and compensation use stable operation identifiers. Crash recovery relies on idempotent retry. Failed delivery cannot be made atomic with the ledger; refund is a compensating transaction, and insufficient seller funds require explicit reconciliation.
