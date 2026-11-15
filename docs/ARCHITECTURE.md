@@ -98,6 +98,12 @@ The bridge intentionally supports only one-time individual command rewards. Repe
 
 The ledger journals reserve/state/refund operations. A payment committed before its settlement-state marker is recovered by replaying the stable payment operation ID; delivery failure after payment starts a compensating refund. If the seller can no longer fund the compensation, the durable result is `REQUIRES_RECONCILIATION`, never a fabricated delivery or silent loss. Shop clients must retain their own delivery evidence and recovery workflow.
 
+## Implemented in P07-E
+
+P07-E adds no shop code, dependencies, or wallet synchronization. Evidence-based review found no documented server-side external-provider boundary in the pinned Money & Sign Shops, Q Shop, or SmartShopMode targets. They remain **NOT SUPPORTED AS DIRECT ECONOMY ADAPTER**: each would otherwise require `$crip` to accept or synchronize an independent wallet, violating the single-ledger authority and recovery model.
+
+Future adapters must isolate target classes by loader and optional discovery, then delegate all monetary authority through `ShopEconomyPort` (or an equally strict server-side provider contract). Shop UI, inventory mutation, stock, pricing, and delivery remain outside `$crip`.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

@@ -1,6 +1,6 @@
 # $crip | Supported Integration Plans
 
-This file lists concrete sources selected for planning and desired user-facing behavior. P07-B implements the Starter Kit command bridge; other entries remain planned unless explicitly marked otherwise.
+This file lists concrete sources selected for planning and desired user-facing behavior. P07-B and P07-C implement their documented command bridges; P07-E records third-party shop adapter research. Other entries remain planned unless explicitly marked otherwise.
 
 ## Priority 1: Serilum Starter Kit
 - Official: https://www.curseforge.com/minecraft/mc-mods/starter-kit ; exact 1.21.1 release: https://www.curseforge.com/minecraft/mc-mods/starter-kit/files/9259631 ; repository: https://github.com/Serilum/Starter-Kit .
@@ -39,10 +39,26 @@ This file lists concrete sources selected for planning and desired user-facing b
 ## Continuing: ChunkLock
 - Make taxes optional and server-owned; type/period/payer must be consistent and idempotent. Obtain actual ChunkLock code/API before claiming supported version.
 
+## P07-E third-party shop research
+
+### Money & Sign Shops — NOT SUPPORTED AS DIRECT ECONOMY ADAPTER
+- Tested research target: `dicemcmm-1.0.2.jar`, Minecraft 1.21 through 1.21.1, NeoForge only. The upstream repository revision inspected was `72502c56625a984d7803339ced2acc9d37a1ab59`.
+- Its published `IMoneyManager` exposes direct `getBalance`, `setBalance`, `changeBalance`, and `transferFunds` operations backed by its own `MoneyWSD` saved data. It does not expose a documented external economy-provider or settlement-delegation boundary.
+- $crip will not call those mutable wallet methods, mirror balances, or synchronize the two stores. Doing so would create dual currency authority and would bypass durable $crip authorization, fee, freeze, confirmation, organization, and recovery rules.
+- No adapter, optional dependency, reflection hook, or third-party binary was added. Consequently, buy/sell/refund/inventory-failure behavior is not advertised as $crip-compatible.
+
+### Q Shop — NOT SUPPORTED AS DIRECT ECONOMY ADAPTER
+- Tested research target: `qshop-neoforge-1.21.1-1.8.5.jar`, Minecraft 1.21.1, NeoForge. Q Shop also publishes a distinct Forge 1.20.1 artifact; that is not Forge 1.21.1 support.
+- Its public project documentation describes custom non-item currencies, player-data wallet storage, and a builder-first KubeJS surface. No documented external economy-provider contract or delegated atomic settlement API was found.
+- $crip will not treat command execution or KubeJS shop management as a currency authority bridge. No adapter or dependency was added.
+
+### SmartShopMode — NOT SUPPORTED AS DIRECT ECONOMY ADAPTER
+- Tested research target: `shopmod-1.8.0-neoforge-1.21.1.jar`, Minecraft 1.21.1, NeoForge. Separate Forge and Fabric 1.21.1 artifacts are published; they are distinct loader builds.
+- Public documentation describes its own buy/sell shop and economy screens, but provides no documented external economy-provider, wallet-delegation, or durable settlement API.
+- No adapter or dependency was added. Reconsider only after a pinned release documents a server-side provider boundary compatible with `$crip`'s `ShopEconomyPort` semantics.
+
 ## Conditional targets
-- Money & Sign Shops: NeoForge 1.21.1 potential provider, only if it exposes a real external ledger integration. https://modrinth.com/mod/money-sign-shops .
 - DarkQuesting: both loaders reported, reward API not confirmed. https://www.curseforge.com/minecraft/mc-mods/darkquesting .
-- SmartShopMode: both loaders reported but new and unproven. https://www.curseforge.com/minecraft/mc-mods/smartshopmode .
 
 No other mod or library is a hard dependency of $crip. More adapter targets can be added through separate user decisions and evidence-backed test packets.
 

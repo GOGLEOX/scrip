@@ -9,8 +9,9 @@
 **P07-A authoritative update (2026-11-14):** P07-A public economy API and integration bridge is complete and verified.
 **P07-B authoritative update (2026-11-14):** P07-B optional Serilum Starter Kit command bridge is complete. Exact Starter Kit+Collective binary-pair testing remains a release-matrix blocker.
 **P07-C authoritative update (2026-11-14):** P07-C optional FTB Quests NeoForge command bridge is complete. Exact FTB Quests binary-pair testing remains a release-matrix blocker.
-**P07-D authoritative update (2026-11-14):** P07-D first-party shop economy provider contract is complete and verified. Stop after P07-D.
-**Current:** P07-D PASS with documented optional-integration binary-matrix blockers. Stop after P07-D.
+**P07-D authoritative update (2026-11-14):** P07-D first-party shop economy provider contract is complete and verified.
+**P07-E authoritative update (2026-11-14):** P07-E third-party shop research is complete. No candidate has a verified delegated-economy provider interface, so no adapter was implemented. Packaged-server smoke verification is blocked by a host loopback-selector failure before mod initialization. Stop after P07-E.
+**Current:** P07-E research complete; build/artifact verification PASS and packaged-server smoke blocked by the host networking environment. Stop after P07-E.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** A separately authorized packet only.
 **Approved backend:** Durable in-memory snapshot + append-only forced journal (ADR-0001 ACCEPTED); SQLite not in v1.  
@@ -135,3 +136,13 @@ Verification on Java 21: `:common:test` passed 46 tests with zero failures; `bui
 `ShopEconomyPort` version 1 provides durable quote, reserve, settle, cancellation/refund, and lookup operations to a future separate trusted shop product. Stable settlement/payment/refund IDs prevent duplicate callbacks; payment and fee policy are revalidated at settlement; failed delivery after payment uses a compensating refund. The provider never claims inventory/journal atomicity and surfaces `REQUIRES_RECONCILIATION` when a seller cannot fund a refund.
 
 The simulated shop consumer tests successful purchase/refund, duplicate reservation, insufficient funds, confirmation threshold, frozen buyer, organization-role removal, restart recovery, and recovery after payment commit before settlement state. Verification on Java 21: `:common:test` passed 50 tests with zero failures; `build verifyArtifacts` verified both P07-D loader artifacts; packaged Forge and NeoForge dedicated-server checks reached readiness and passed the vanilla reconnect probe. No real shop, inventory, GUI, catalog, stock, auction, tax, or separate balance implementation is included.
+
+## P07-E implementation record
+
+**P07-E verification: research complete; packaged-server smoke blocked. Stop after P07-E.**
+
+P07-E is a deliberately no-code result. Public release metadata and documented interfaces were reviewed for Money & Sign Shops `dicemcmm-1.0.2.jar` (NeoForge, Minecraft 1.21–1.21.1), Q Shop `qshop-neoforge-1.21.1-1.8.5.jar`, and SmartShopMode `shopmod-1.8.0` Forge/NeoForge Minecraft 1.21.1 artifacts. Money & Sign Shops' inspected upstream source exposes direct mutation of its own saved wallet; Q Shop and SmartShopMode publish internal-currency shop behavior but no documented external-provider or delegated atomic-settlement API.
+
+All three are therefore **NOT SUPPORTED AS DIRECT ECONOMY ADAPTER**. $crip adds no hard dependency, reflection hook, external wallet mutation, mirrored database, or claimed buy/sell/refund behavior.
+
+Verification on Java 21: `:common:test --rerun-tasks` completed successfully with 50 tests and zero failures; `build verifyArtifacts` completed successfully and verified `0.1.0-p07-e` Forge and NeoForge artifacts. Packaged Forge and NeoForge dedicated-server smoke runs were both attempted with the new artifacts, but each failed before mod initialization while the JDK failed to establish its loopback selector connection. This is a shared host networking failure, not an observed loader or `$crip` exception; the packaged smoke and vanilla reconnect probes must be rerun in an environment with functional Java loopback selectors before release verification can be called complete.

@@ -125,5 +125,10 @@
 ## P07-D first-party shop economy provider | 2026-11-14
 
 - `ShopEconomyPort` version 1 is a money-only contract for a separate trusted server product. Pricing input is designated server-provided; the port has no client endpoint and does not implement a shop.
+
+## P07-E third-party shop authority | 2026-11-14
+
+- Reject dual-wallet synchronization. A third-party shop may become an adapter target only when a pinned loader-specific artifact documents a server-authoritative external-provider boundary that lets `$crip` retain the sole balance ledger.
+- Money & Sign Shops `1.0.2`, Q Shop `1.8.5` for NeoForge 1.21.1, and SmartShopMode `1.8.0` for Forge/NeoForge 1.21.1 are **NOT SUPPORTED AS DIRECT ECONOMY ADAPTER** after public-interface review. No adapter, reflection hook, dependency, or mirrored store is permitted from this result.
 - A reservation is durable state, not a balance lock. Settlement is the sole debit point and always revalidates current authorization, freeze state, balance, fee policy, and confirmation eligibility.
 - Payment, settlement state, and compensation use stable operation identifiers. Crash recovery relies on idempotent retry. Failed delivery cannot be made atomic with the ledger; refund is a compensating transaction, and insufficient seller funds require explicit reconciliation.

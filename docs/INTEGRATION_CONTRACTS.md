@@ -55,12 +55,17 @@ Payment confirmation remains server-authoritative: a confirmation-required quote
 ## 6. Future ChunkLock
 - Optional tax debit and payout API, not direct storage or required $crip module. Specific ChunkLock loader and version must be pinned before implementation.
 
-## 7. Adapter packaging and release
+## 7. Third-party shop adapter eligibility
+- A third-party shop is eligible only when its pinned target artifact documents a server-side external-provider boundary that delegates balance authority and has a recovery-safe settlement lifecycle. The adapter must retain `$crip` as the sole wallet and use `ShopEconomyPort` or an equivalently strict server-side boundary.
+- A mutable internal wallet API, shop command surface, capability, event, or scripting hook is not by itself an economy-provider API. $crip will not mirror balances, mutate a third-party wallet, or synchronize two balance stores.
+- P07-E records Money & Sign Shops, Q Shop, and SmartShopMode as **NOT SUPPORTED AS DIRECT ECONOMY ADAPTER**. Their inspected public surfaces do not document the required delegation boundary. See `docs/INTEGRATIONS.md` and `docs/COMPATIBILITY_MATRIX.md` for pinned research targets and limitations.
+
+## 8. Adapter packaging and release
 - Reflection or guarded classloading where appropriate; no target class touched at mod initialization if optional target absent.
 - Advertise only tested names, target versions, exact loader, expected config, verified API level and limitation.
 - No libraries/repackaged third-party assets copied unless licensed and technically necessary.
 
-## 8. Maintenance integration invariant
+## 9. Maintenance integration invariant
 - Adapter-visible account IDs remain stable across `ACCOUNT_CLOSED_INACTIVE` closure; known offline UUIDs must still accept payment through safe on-demand reactivation.
 - Closing an inactive account cannot delete first-join, kit, quest, reward or settlement claim keys, and cannot invalidate a pending shop settlement.
 - No adapter obtains a privileged journal-cleanup or account-purge API. All maintenance is server/console-administrator authorized and auditable.
