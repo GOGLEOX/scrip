@@ -92,6 +92,12 @@ P07-C uses no FTB classes. NeoForge optionally detects `ftbquests`, while Forge 
 
 The bridge intentionally supports only one-time individual command rewards. Repeatable rewards lack a verified occurrence identifier, and team-wide distribution lacks an approved recipient policy. Both remain excluded rather than inferred from FTB's command-format team variables.
 
+## Implemented in P07-D
+
+`ShopEconomyPort` version 1 is a separate-product money provider boundary. It records immutable quotes and durable settlements but does not contain inventory, catalog, stock, GUI, or delivery logic. Reservations retain payment details and stable payment/refund operation identifiers; they do not reserve an account balance. Settlement reuses the atomic payment engine and revalidates actor, organization role, lifecycle, balance, policy revision, and fee immediately before debit.
+
+The ledger journals reserve/state/refund operations. A payment committed before its settlement-state marker is recovered by replaying the stable payment operation ID; delivery failure after payment starts a compensating refund. If the seller can no longer fund the compensation, the durable result is `REQUIRES_RECONCILIATION`, never a fabricated delivery or silent loss. Shop clients must retain their own delivery evidence and recovery workflow.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

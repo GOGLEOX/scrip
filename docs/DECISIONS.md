@@ -121,3 +121,9 @@
 - FTB Quests Command Reward is a NeoForge-only optional integration. Its verified 1.21.1 source creates the command context from the claiming `ServerPlayer`; `$crip` resolves `@s` from that context and does not trust the name-only `{p}` replacement.
 - A static validated `quest-id:reward-id` pair plus the server-resolved player UUID forms the durable once-only claim. Duplicate callbacks, relog, restart, and rename cannot issue again.
 - Repeatable claims and team-wide payouts are not implemented. The command reward has no verified unique occurrence field, and its team metadata does not direct $crip to enumerate or pay members.
+
+## P07-D first-party shop economy provider | 2026-11-14
+
+- `ShopEconomyPort` version 1 is a money-only contract for a separate trusted server product. Pricing input is designated server-provided; the port has no client endpoint and does not implement a shop.
+- A reservation is durable state, not a balance lock. Settlement is the sole debit point and always revalidates current authorization, freeze state, balance, fee policy, and confirmation eligibility.
+- Payment, settlement state, and compensation use stable operation identifiers. Crash recovery relies on idempotent retry. Failed delivery cannot be made atomic with the ledger; refund is a compensating transaction, and insufficient seller funds require explicit reconciliation.

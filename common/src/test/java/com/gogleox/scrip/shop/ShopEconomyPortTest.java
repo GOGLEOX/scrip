@@ -1,0 +1,37 @@
+package com.gogleox.scrip.shop;
+
+import com.gogleox.scrip.account.*;
+import com.gogleox.scrip.ledger.AccountLedger;
+import com.gogleox.scrip.organization.*;
+import java.nio.file.*;
+import java.util.*;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+/** Simulated server-side shop consumer; it carries no inventory or catalog implementation. */
+class ShopEconomyPortTest {
+    private static final UUID BUYER=UUID.fromString("00000000-0000-0000-0000-0000000000a1"),SELLER=UUID.fromString("00000000-0000-0000-0000-0000000000a2"),MANAGER=UUID.fromString("00000000-0000-0000-0000-0000000000a3");
+    @Test void purchaseDuplicateCancellationRefundAndRestartRecovery() throws Exception {
+        Path dir=Files.createTempDirectory("scrip-shop");try(AccountLedger ledger=AccountLedger.open(dir,CurrencyDefinition.defaultCurrency())){
+            AccountId buyer=register(ledger,BUYER,"Buyer"),seller=register(ledger,SELLER,"Seller");ledger.adjust(new AdjustmentRequest(UUID.randomUUID(),buyer,100,"seed")).toCompletableFuture().join();ShopConsumer shop=new ShopConsumer(new DefaultShopEconomyPort(ledger));ShopQuote quote=shop.quote(BUYER,buyer,seller,30,"item-a");assertEquals(SettlementResult.Status.RESERVED,shop.reserve("order-a",quote).status());assertEquals(SettlementResult.Status.DUPLICATE,shop.reserve("order-a",quote).status());assertEquals(SettlementResult.Status.SETTLED,shop.deliver("order-a").status());assertEquals(70,ledger.findAccount(buyer).orElseThrow().balance().units());assertEquals(30,ledger.findAccount(seller).orElseThrow().balance().units());assertEquals(SettlementResult.Status.REFUNDED,shop.refund("order-a").status());assertEquals(100,ledger.findAccount(buyer).orElseThrow().balance().units());assertEquals(0,ledger.findAccount(seller).orElseThrow().balance().units());ShopQuote pending=shop.quote(BUYER,buyer,seller,10,"item-b");assertEquals(SettlementResult.Status.RESERVED,shop.reserve("order-b",pending).status());
+        }try(AccountLedger replayed=AccountLedger.open(dir,CurrencyDefinition.defaultCurrency())){ShopConsumer shop=new ShopConsumer(new DefaultShopEconomyPort(replayed));assertEquals(SettlementResult.Status.SETTLED,shop.deliver("order-b").status());assertEquals(90,replayed.findPersonal(BUYER).orElseThrow().balance().units());}
+    }
+    @Test void rejectsInsufficientFrozenAndChangedOrganizationAuthority() throws Exception {
+        Path dir=Files.createTempDirectory("scrip-shop-auth");try(AccountLedger ledger=AccountLedger.open(dir,CurrencyDefinition.defaultCurrency())){
+            AccountId buyer=register(ledger,BUYER,"Buyer"),seller=register(ledger,SELLER,"Seller");ShopConsumer shop=new ShopConsumer(new DefaultShopEconomyPort(ledger));assertEquals(ShopQuoteResult.Status.INSUFFICIENT_FUNDS,shop.quoteResult(BUYER,buyer,seller,1).status());ledger.adjust(new AdjustmentRequest(UUID.randomUUID(),buyer,50,"seed")).toCompletableFuture().join();ledger.setFrozen(UUID.randomUUID(),buyer,true,AuditActor.console(),"test").toCompletableFuture().join();assertEquals(ShopQuoteResult.Status.UNAUTHORIZED,shop.quoteResult(BUYER,buyer,seller,1).status());ledger.setFrozen(UUID.randomUUID(),buyer,false,AuditActor.console(),"test").toCompletableFuture().join();
+            register(ledger,MANAGER,"Manager");OrganizationSnapshot org=ledger.createOrganization(UUID.randomUUID(),"Guild",BUYER).toCompletableFuture().join().organization().orElseThrow();ledger.inviteMember(UUID.randomUUID(),org.id(),BUYER,MANAGER).toCompletableFuture().join();ledger.acceptInvitation(UUID.randomUUID(),org.id(),MANAGER).toCompletableFuture().join();ledger.changeRole(UUID.randomUUID(),org.id(),BUYER,MANAGER,OrganizationRole.MANAGER).toCompletableFuture().join();ledger.depositToOrganization(UUID.randomUUID(),org.id(),BUYER,20).toCompletableFuture().join();ShopQuote quote=shop.quote(MANAGER,org.accountId(),seller,10,"org-item");assertEquals(SettlementResult.Status.RESERVED,shop.reserve("org-order",quote).status());ledger.changeRole(UUID.randomUUID(),org.id(),BUYER,MANAGER,OrganizationRole.MEMBER).toCompletableFuture().join();assertEquals(SettlementResult.Status.UNAUTHORIZED,shop.deliver("org-order").status());
+        }
+    }
+    @Test void recoversWhenPaymentWasCommittedBeforeSettlementState() throws Exception {
+        Path dir=Files.createTempDirectory("scrip-shop-recovery");try(AccountLedger ledger=AccountLedger.open(dir,CurrencyDefinition.defaultCurrency())){
+            AccountId buyer=register(ledger,BUYER,"Buyer"),seller=register(ledger,SELLER,"Seller");ledger.adjust(new AdjustmentRequest(UUID.randomUUID(),buyer,20,"seed")).toCompletableFuture().join();DefaultShopEconomyPort port=new DefaultShopEconomyPort(ledger);ShopConsumer shop=new ShopConsumer(port);ShopQuote quote=shop.quote(BUYER,buyer,seller,10,"recovery");assertEquals(SettlementResult.Status.RESERVED,shop.reserve("crash-order",quote).status());ShopSettlement reserved=port.getSettlement("crash-order").toCompletableFuture().join().settlement().orElseThrow();assertEquals(TransferOutcome.Status.SUCCESS,ledger.executePayment(reserved.paymentOperationId(),BUYER,buyer,seller,10,0,reserved.policyRevision()).toCompletableFuture().join().status());
+        }try(AccountLedger replayed=AccountLedger.open(dir,CurrencyDefinition.defaultCurrency())){ShopConsumer shop=new ShopConsumer(new DefaultShopEconomyPort(replayed));assertEquals(SettlementResult.Status.SETTLED,shop.deliver("crash-order").status());assertEquals(10,replayed.findPersonal(BUYER).orElseThrow().balance().units());}
+    }
+    @Test void confirmationThresholdAppliesBeforeReservation() throws Exception {
+        Path dir=Files.createTempDirectory("scrip-shop-confirm");try(AccountLedger ledger=AccountLedger.open(dir,CurrencyDefinition.defaultCurrency())){
+            AccountId buyer=register(ledger,BUYER,"Buyer"),seller=register(ledger,SELLER,"Seller");ledger.adjust(new AdjustmentRequest(UUID.randomUUID(),buyer,2_000,"seed")).toCompletableFuture().join();ShopEconomyPort port=new DefaultShopEconomyPort(ledger);ShopQuote quote=port.quote(new ShopQuoteRequest(BUYER,buyer,seller,2_000,"high-value")).toCompletableFuture().join().quote().orElseThrow();assertEquals(SettlementResult.Status.CONFIRMATION_REQUIRED,port.reserve("high-order",quote,false).toCompletableFuture().join().status());assertEquals(SettlementResult.Status.RESERVED,port.reserve("high-order",quote,true).toCompletableFuture().join().status());
+        }
+    }
+    private static AccountId register(AccountLedger ledger,UUID player,String name){return ledger.registerPlayer(player,name).toCompletableFuture().join().id();}
+    private static final class ShopConsumer { private final ShopEconomyPort port; ShopConsumer(ShopEconomyPort port){this.port=port;} ShopQuoteResult quoteResult(UUID actor,AccountId buyer,AccountId seller,long amount){return port.quote(new ShopQuoteRequest(actor,buyer,seller,amount,"server-price")).toCompletableFuture().join();} ShopQuote quote(UUID actor,AccountId buyer,AccountId seller,long amount,String reference){return port.quote(new ShopQuoteRequest(actor,buyer,seller,amount,reference)).toCompletableFuture().join().quote().orElseThrow();} SettlementResult reserve(String id,ShopQuote quote){return port.reserve(id,quote,true).toCompletableFuture().join();} SettlementResult deliver(String id){return port.settle(id,true).toCompletableFuture().join();} SettlementResult refund(String id){return port.cancelOrRefund(id,"delivery evidence failed").toCompletableFuture().join();} }
+}

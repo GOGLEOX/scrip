@@ -9,7 +9,8 @@
 **P07-A authoritative update (2026-11-14):** P07-A public economy API and integration bridge is complete and verified.
 **P07-B authoritative update (2026-11-14):** P07-B optional Serilum Starter Kit command bridge is complete. Exact Starter Kit+Collective binary-pair testing remains a release-matrix blocker.
 **P07-C authoritative update (2026-11-14):** P07-C optional FTB Quests NeoForge command bridge is complete. Exact FTB Quests binary-pair testing remains a release-matrix blocker.
-**Current:** P07-C PASS with documented binary-matrix blockers. Stop after P07-C.
+**P07-D authoritative update (2026-11-14):** P07-D first-party shop economy provider contract is complete and verified. Stop after P07-D.
+**Current:** P07-D PASS with documented optional-integration binary-matrix blockers. Stop after P07-D.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** A separately authorized packet only.
 **Approved backend:** Durable in-memory snapshot + append-only forced journal (ADR-0001 ACCEPTED); SQLite not in v1.  
@@ -126,3 +127,11 @@ Verification on Java 21: `:common:test` passed 45 tests with zero failures; `bui
 P07-C adds no FTB dependency. NeoForge detects `ftbquests` at runtime; Forge keeps the source disabled. The command reward bridge accepts only the verified player command context, static hexadecimal quest/reward IDs, a positive bounded amount, and a known account, then routes issuance through the P07-A trusted API. It derives the UUID-bound one-time claim itself. Repeatable and team-wide payouts remain unsupported by design.
 
 Verification on Java 21: `:common:test` passed 46 tests with zero failures; `build verifyArtifacts` verified both P07-C loader artifacts; packaged Forge and NeoForge dedicated-server checks passed without FTB Quests and completed the vanilla reconnect probe. Common regression coverage verifies missing-mod rejection, invalid/mismatched command context, valid issue, duplicate callback, restart replay, and rename-safe UUID identity. Exact FTB Quests NeoForge binary installation/completion and team behavior remain release-matrix evidence required before full runtime compatibility can be claimed.
+
+## P07-D implementation record
+
+**P07-D verification: PASS. Stop after P07-D.**
+
+`ShopEconomyPort` version 1 provides durable quote, reserve, settle, cancellation/refund, and lookup operations to a future separate trusted shop product. Stable settlement/payment/refund IDs prevent duplicate callbacks; payment and fee policy are revalidated at settlement; failed delivery after payment uses a compensating refund. The provider never claims inventory/journal atomicity and surfaces `REQUIRES_RECONCILIATION` when a seller cannot fund a refund.
+
+The simulated shop consumer tests successful purchase/refund, duplicate reservation, insufficient funds, confirmation threshold, frozen buyer, organization-role removal, restart recovery, and recovery after payment commit before settlement state. Verification on Java 21: `:common:test` passed 50 tests with zero failures; `build verifyArtifacts` verified both P07-D loader artifacts; packaged Forge and NeoForge dedicated-server checks reached readiness and passed the vanilla reconnect probe. No real shop, inventory, GUI, catalog, stock, auction, tax, or separate balance implementation is included.

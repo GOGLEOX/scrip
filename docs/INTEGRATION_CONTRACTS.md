@@ -44,20 +44,13 @@ Docs: https://docs.feed-the-beast.com/mod-docs/1.21.1/mods/suite/Quests/Develope
 - No native FTB custom reward API is used or inferred. The exact NeoForge binary pair remains a compatibility-matrix release test.
 
 ## 5. First-party shop provider
-An eventual GOGLEOX shop mod/plug-in will call a **stable neutral port** from the same server-side $crip process or an explicit separate protocol if built for another platform. First version is **API contract + sample consumer**, not shop mod implementation.
+P07-D implements `ShopEconomyPort` version 1 as a stable neutral provider contract for a separate server-side shop product. It exposes `quote`, `reserve`, `settle`, `cancelOrRefund`, and `getSettlement` through immutable asynchronous values. It does not expose catalog, stock, inventory, or GUI behavior.
 
-```java
-// Architectural sketch only.
-interface ShopEconomyPort {
-    CompletionStage<PaymentQuote> quote(ShopActor actor, AccountId buyer, AccountId seller, long amount);
-    CompletionStage<PaymentReservation> reserve(String settlementId, PaymentQuote quote);
-    CompletionStage<SettlementResult> settle(String settlementId, DeliveryEvidence delivery);
-    CompletionStage<SettlementResult> cancelOrRefund(String settlementId, FailureReason failure);
-    CompletionStage<SettlementResult> getSettlement(String settlementId);
-}
-```
+`ShopQuote` binds authenticated buyer actor, buyer/seller typed accounts, server-provided price reference, calculated fee, policy revision, expiry, and confirmation requirement. A reservation is durable, but deliberately does not lock Coins; settlement revalidates balance, freeze state, organization role, and fee policy. This prevents a reservation from claiming that payment has already occurred.
 
-Suggested monotonic states: `QUOTED`, `RESERVED`, `SETTLEMENT_PENDING`, `SETTLED`, `REFUND_PENDING`, `REFUNDED`, `CANCELLED`, `NEEDS_ADMIN_REVIEW`. Fee rules and balance confirmation remain enforced by $crip, not shop. A ledger commit does **not** atomically deliver Minecraft items. Durable settlement state, expiry/recovery and compensating refunds are required. Never presume a plugin (Paper/Bukkit) can invoke the Forge/NeoForge Java interface without an explicit bridge design.
+Durable states are `QUOTED`, `RESERVED`, `SETTLED`, `CANCELLED`, `REFUND_PENDING`, `REFUNDED`, and `REQUIRES_RECONCILIATION`. A stable settlement ID carries stable payment and refund operation IDs. If a crash occurs after payment before the `SETTLED` marker, retry safely observes the idempotent payment operation and completes state recovery. A failed external delivery after payment enters `REFUND_PENDING`, then issues a compensating amount-and-fee refund; insufficient seller funds leave `REQUIRES_RECONCILIATION` for operator recovery.
+
+Payment confirmation remains server-authoritative: a confirmation-required quote cannot reserve without the authenticated server consumer declaring its buyer-confirmed step. A real shop must acquire that approval through its own server-side interaction; no client flag or inventory callback is trusted directly by $crip. A successful Coin debit is never inventory-delivery evidence, and there is no cross-system atomicity claim.
 
 ## 6. Future ChunkLock
 - Optional tax debit and payout API, not direct storage or required $crip module. Specific ChunkLock loader and version must be pinned before implementation.
