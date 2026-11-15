@@ -1,10 +1,10 @@
 # $crip | Optional-Client Protocol Status
 
-## P08 status: blocked before implementation
+## P08 status: transport blocker resolved; protocol not yet implemented
 
-P08 requires actual Forge and NeoForge connections for both unmodified and matching-mod clients. The available packaged dedicated-server probes fail before `$crip` initializes: the Java runtime cannot establish the loopback selector connection used by the server network stack. This blocks both loader matrices and prevents meaningful payload negotiation, malformed-packet, or replay tests.
+P08 requires actual Forge and NeoForge connections for both unmodified and matching-mod clients. The packaged dedicated-server probes now start and pass the unmodified-client reconnect probe when launched with the local Java option `-Djdk.net.unixdomain.tmpdir=.tools/java-tmp`. This option keeps temporary Unix-domain sockets within a short workspace-relative path.
 
-No P08 payload, channel, client class, loader registration, or protocol-version advertisement has been added while this environment failure persists. The existing server-only command interface remains the supported path for unmodified clients.
+No P08 payload, channel, client class, loader registration, or protocol-version advertisement has been added yet. The existing server-only command interface remains the supported path for unmodified clients.
 
 ## Approved implementation boundary after the blocker is resolved
 

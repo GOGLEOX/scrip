@@ -112,7 +112,7 @@ The ledger commits a tax invoice identity, calculated fee, balance debit, recipi
 
 ## P08 optional-client networking status
 
-P08 is blocked before implementation. Packaged Forge and NeoForge servers currently fail in the Java network stack before `$crip` initialization, so the required unmodified-client and matching-mod client connection matrix cannot be exercised. No payload registration or client class has been added. `docs/NETWORK_PROTOCOL.md` records the validated future boundary and required evidence; server commands remain the unmodified-client fallback.
+The host transport blocker is resolved: packaged Forge and NeoForge servers start and pass unmodified-client reconnect probes when launched with the documented workspace-relative Java temporary-socket override. P08 protocol implementation and matching-mod client tests remain pending. No payload registration or client class has been added. `docs/NETWORK_PROTOCOL.md` records the validated future boundary and required evidence; server commands remain the unmodified-client fallback.
 
 ## Approved future architecture (not implemented)
 

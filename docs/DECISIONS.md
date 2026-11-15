@@ -139,6 +139,6 @@
 ## P08 optional-client networking | 2026-11-14
 
 - Do not register an untested optional-client channel merely because its loader metadata or compilation succeeds. P08 requires actual matching-mod and unmodified-client connection evidence on both loaders.
-- The present Java loopback-selector failure occurs before either loader reaches `$crip` initialization. Keep the command fallback unchanged and defer payload registration until this host blocker is resolved and the full protocol matrix can run.
+- The Java loopback-selector failure is resolved by the documented workspace-relative temporary-socket override. Keep the command fallback unchanged until payload negotiation and the full matching-mod client matrix are implemented and tested.
 - A reservation is durable state, not a balance lock. Settlement is the sole debit point and always revalidates current authorization, freeze state, balance, fee policy, and confirmation eligibility.
 - Payment, settlement state, and compensation use stable operation identifiers. Crash recovery relies on idempotent retry. Failed delivery cannot be made atomic with the ledger; refund is a compensating transaction, and insufficient seller funds require explicit reconciliation.
