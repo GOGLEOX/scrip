@@ -135,5 +135,10 @@
 
 - `TaxPaymentPort` version 1 is the optional money-only consumer boundary for a separate tax authority. Durable invoice/period idempotency, payer authorization, fees, freezing, organization spending authority, and atomic journal commit belong to `$crip`; all property and unpaid-tax policy belongs to ChunkLock.
 - Do not compile a ChunkLock adapter, add a dependency, or infer a public hook until a Minecraft 1.21.1 loader-specific artifact and server-side API are pinned and verified. Current public research found only a Forge 1.20.1 “Chunk Lock” release, which is not a supported target.
+
+## P08 optional-client networking | 2026-11-14
+
+- Do not register an untested optional-client channel merely because its loader metadata or compilation succeeds. P08 requires actual matching-mod and unmodified-client connection evidence on both loaders.
+- The present Java loopback-selector failure occurs before either loader reaches `$crip` initialization. Keep the command fallback unchanged and defer payload registration until this host blocker is resolved and the full protocol matrix can run.
 - A reservation is durable state, not a balance lock. Settlement is the sole debit point and always revalidates current authorization, freeze state, balance, fee policy, and confirmation eligibility.
 - Payment, settlement state, and compensation use stable operation identifiers. Crash recovery relies on idempotent retry. Failed delivery cannot be made atomic with the ledger; refund is a compensating transaction, and insufficient seller funds require explicit reconciliation.

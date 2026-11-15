@@ -110,6 +110,10 @@ Future adapters must isolate target classes by loader and optional discovery, th
 
 The ledger commits a tax invoice identity, calculated fee, balance debit, recipient credit, and operation receipt as one forced journal entry. The durable invoice/period key rejects changed-payload reuse and makes exact retries safe through restart. Personal ownership, organization manager/owner authority, frozen lifecycle, fee-policy balance, and account existence are revalidated immediately before the commit. An absent or disabled tax authority has no effect on `$crip`; no ChunkLock class is referenced.
 
+## P08 optional-client networking status
+
+P08 is blocked before implementation. Packaged Forge and NeoForge servers currently fail in the Java network stack before `$crip` initialization, so the required unmodified-client and matching-mod client connection matrix cannot be exercised. No payload registration or client class has been added. `docs/NETWORK_PROTOCOL.md` records the validated future boundary and required evidence; server commands remain the unmodified-client fallback.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

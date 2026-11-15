@@ -12,7 +12,8 @@
 **P07-D authoritative update (2026-11-14):** P07-D first-party shop economy provider contract is complete and verified.
 **P07-E authoritative update (2026-11-14):** P07-E third-party shop research is complete. No candidate has a verified delegated-economy provider interface, so no adapter was implemented. Packaged-server smoke verification is blocked by a host loopback-selector failure before mod initialization.
 **P07-F authoritative update (2026-11-14):** P07-F optional ChunkLock tax-payment contract is complete. No compiled ChunkLock adapter is included because a compatible 1.21.1 artifact and public hook are unverified. Stop after P07-F.
-**Current:** P07-F contract complete; build/artifact verification PASS and packaged-server smoke remains host-networking blocked. Stop after P07-F.
+**P08 authoritative update (2026-11-14):** P08 optional-client networking is blocked before implementation. Forge and NeoForge packaged servers fail in the Java loopback selector before mod initialization, preventing the mandatory real connection matrix. Stop after P08.
+**Current:** P08 blocked by host Java networking before loader/mod initialization. The server command fallback remains available by design. Stop after P08.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** A separately authorized packet only.
 **Approved backend:** Durable in-memory snapshot + append-only forced journal (ADR-0001 ACCEPTED); SQLite not in v1.  
@@ -157,3 +158,9 @@ Verification on Java 21: `:common:test --rerun-tasks` completed successfully wit
 Public research found only `chunklock-1.20.1-forge-v1.0.0.jar`; no Minecraft 1.21.1 ChunkLock artifact, loader target, or public integration hook has been verified. Accordingly, no ChunkLock dependency, reflection, event, command, claim, tax assessment, or enforcement code is present.
 
 Verification on Java 21: `:common:test --rerun-tasks` completed successfully with 53 tests and zero failures; `build verifyArtifacts` completed successfully and verified `0.1.0-p07-f` Forge and NeoForge artifacts. Packaged Forge and NeoForge dedicated-server smoke runs were both attempted with the new artifacts, but each stopped before mod initialization with the same JDK loopback-selector failure (`Unable to establish loopback connection`). The vanilla reconnect probes must be rerun where Java loopback selectors work before release verification is complete.
+
+## P08 blocker record
+
+**P08 blocked before implementation. Stop after P08.**
+
+Both loader-specific packaged smoke probes fail before `$crip` initializes with Java unable to establish its loopback selector connection. This prevents required Forge/NeoForge unmodified-client reconnects and matching-mod client negotiations, as well as malformed-packet, size, replay, and permission tests. Per the packet stop condition, no optional-client payload registration, GUI, HUD, or client-only class was added. `docs/NETWORK_PROTOCOL.md` documents the future versioned protocol boundary and required evidence to resume.
