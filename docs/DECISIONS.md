@@ -136,9 +136,11 @@
 - `TaxPaymentPort` version 1 is the optional money-only consumer boundary for a separate tax authority. Durable invoice/period idempotency, payer authorization, fees, freezing, organization spending authority, and atomic journal commit belong to `$crip`; all property and unpaid-tax policy belongs to ChunkLock.
 - Do not compile a ChunkLock adapter, add a dependency, or infer a public hook until a Minecraft 1.21.1 loader-specific artifact and server-side API are pinned and verified. Current public research found only a Forge 1.20.1 “Chunk Lock” release, which is not a supported target.
 
-## P08 optional-client networking | 2026-11-14
+## P08 optional-client networking | 2026-11-23
 
-- Do not register an untested optional-client channel merely because its loader metadata or compilation succeeds. P08 requires actual matching-mod and unmodified-client connection evidence on both loaders.
-- The Java loopback-selector failure is resolved by the documented workspace-relative temporary-socket override. Keep the command fallback unchanged until payload negotiation and the full matching-mod client matrix are implemented and tested.
+- The shared protocol has version 1, an 8 KiB request bound, a per-connection negotiated capability record, a ten-second 20-request limit, and a bounded replay window. The connection identity supplies the actor; request values never establish ownership or permission.
+- Optional Forge and NeoForge server-bound handshakes use protocol version 1 and carry only declared client capabilities. They are optional, so unmodified clients retain command access and receive no optional payload.
+- The server dispatcher filters selected accounts and bounded history through current server authorization, and sends payment preview, confirmation, and cancellation through the existing server-authoritative payment service. It never exposes ledger state or accepts a client balance mutation.
+- No physical-client class is registered by the dedicated-server adapters. Client-side request/response codecs and real matching-client connection evidence remain required before P08 can be called complete.
 - A reservation is durable state, not a balance lock. Settlement is the sole debit point and always revalidates current authorization, freeze state, balance, fee policy, and confirmation eligibility.
 - Payment, settlement state, and compensation use stable operation identifiers. Crash recovery relies on idempotent retry. Failed delivery cannot be made atomic with the ledger; refund is a compensating transaction, and insufficient seller funds require explicit reconciliation.

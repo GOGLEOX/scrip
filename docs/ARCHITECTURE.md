@@ -112,7 +112,9 @@ The ledger commits a tax invoice identity, calculated fee, balance debit, recipi
 
 ## P08 optional-client networking status
 
-The host transport blocker is resolved: packaged Forge and NeoForge servers start and pass unmodified-client reconnect probes when launched with the documented workspace-relative Java temporary-socket override. P08 protocol implementation and matching-mod client tests remain pending. No payload registration or client class has been added. `docs/NETWORK_PROTOCOL.md` records the validated future boundary and required evidence; server commands remain the unmodified-client fallback.
+P08 defines one loader-neutral version-1 wallet protocol with an 8 KiB inbound bound, negotiated capability record, bounded replay identifiers, and per-player rate limit. A server dispatcher derives the actor from the connection, rechecks account visibility for selection/history, and reaches the established payment preview/confirmation/cancellation service instead of mutating balance state. Forge and NeoForge install optional server-bound handshakes only; neither adapter references a physical-client type on a dedicated server. Unmodified clients remain supported through commands and receive no optional payload.
+
+Client request/response codecs and the actual matching-mod connection matrix are not yet complete. `docs/NETWORK_PROTOCOL.md` records the remaining evidence; no GUI or client-authoritative rule is introduced.
 
 ## Approved future architecture (not implemented)
 

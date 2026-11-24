@@ -24,6 +24,14 @@ public final class PaymentService {
         PaymentPreview preview=pending.remove(nonce);if(preview==null)return PaymentResult.of(PaymentResult.Status.NONCE_USED,null);if(!preview.actorId().equals(actor))return PaymentResult.of(PaymentResult.Status.UNAUTHORIZED,null);if(!clock.instant().isBefore(preview.expiresAt()))return PaymentResult.of(PaymentResult.Status.EXPIRED,null);if(ledger.paymentPolicy().revision()!=preview.policyRevision())return PaymentResult.of(PaymentResult.Status.POLICY_CHANGED,null);
         TransferOutcome outcome=ledger.executePayment(UUID.randomUUID(),actor,preview.source(),preview.destination(),preview.amount(),preview.fee(),preview.policyRevision()).toCompletableFuture().join();return PaymentResult.of(map(outcome),preview);
     }
+    /** Discards an unexecuted server-generated preview only when its original actor requests cancellation. */
+    public synchronized PaymentResult cancel(UUID actor, UUID nonce) {
+        PaymentPreview preview = pending.get(nonce);
+        if (preview == null) return PaymentResult.of(PaymentResult.Status.NONCE_USED, null);
+        if (!preview.actorId().equals(actor)) return PaymentResult.of(PaymentResult.Status.UNAUTHORIZED, null);
+        pending.remove(nonce);
+        return PaymentResult.of(PaymentResult.Status.CANCELLED, preview);
+    }
     public synchronized PaymentResult executeWithoutConfirmation(UUID actor,PaymentPreview preview) { if(preview.confirmationRequired())return PaymentResult.of(PaymentResult.Status.CONFIRMATION_REQUIRED,preview);return confirm(actor,preview.nonce()); }
     /** API path: consumes the server-created preview and returns the durable transfer outcome. */
     public synchronized TransferOutcome executeAuthorizedPreview(UUID actor, PaymentPreview preview) {

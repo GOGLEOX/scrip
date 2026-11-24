@@ -25,6 +25,7 @@ public final class ScripForge {
     private CommandService commands;
 
     public ScripForge() {
+        ScripForgeNetwork.initialize();
         MinecraftForge.EVENT_BUS.addListener(this::serverStarting);
         MinecraftForge.EVENT_BUS.addListener(this::serverStarted);
         MinecraftForge.EVENT_BUS.addListener(this::serverStopping);

@@ -40,6 +40,20 @@ public final class CommandService {
     public void setFtbQuestsCompatible(boolean compatible) { ftbQuestsCompatible=compatible; }
     public Optional<AccountSnapshot> balance(UUID playerId) { return ledger.findPersonal(playerId); }
     public Optional<AccountSnapshot> balanceByVerifiedPlayer(UUID playerId) { return ledger.findPersonal(playerId); }
+    /** Returns an account only when the authenticated actor may view it. */
+    public Optional<AccountSnapshot> accountForActor(UUID actorId, com.gogleox.scrip.account.AccountId accountId) {
+        return ledger.accessibleAccounts(actorId).stream().anyMatch(access -> access.accountId().equals(accountId))
+                ? ledger.findAccount(accountId) : Optional.empty();
+    }
+    /** Uses server-side permission checks before creating a payment preview. */
+    public PaymentResult previewPayment(UUID actorId, com.gogleox.scrip.account.AccountId source, com.gogleox.scrip.account.AccountId destination, long amount) {
+        return payments.preview(actorId, source, destination, amount);
+    }
+    /** Bounded account history after server-side view authorization. */
+    public List<TransactionRecord> historyForActor(UUID actorId, com.gogleox.scrip.account.AccountId accountId, int limit) {
+        if (limit < 1 || limit > 100 || accountForActor(actorId, accountId).isEmpty()) return List.of();
+        return ledger.history(accountId).stream().limit(limit).toList();
+    }
     public TransferOutcome pay(UUID senderId, UUID recipientId, long amount, UUID operationId) {
         Optional<AccountSnapshot> sender = balance(senderId), recipient = balanceByVerifiedPlayer(recipientId);
         if (sender.isEmpty() || recipient.isEmpty()) return TransferOutcome.rejected(TransferOutcome.Status.UNKNOWN_ACCOUNT, operationId);
@@ -56,6 +70,7 @@ public final class CommandService {
     public PaymentResult previewPersonalPayment(UUID actorId,UUID recipientId,long amount) { return balance(actorId).flatMap(source -> balanceByVerifiedPlayer(recipientId).map(destination -> payments.preview(actorId,source.id(),destination.id(),amount))).orElseGet(()->PaymentResult.of(PaymentResult.Status.UNKNOWN_ACCOUNT,null)); }
     public PaymentResult executePreview(UUID actorId,com.gogleox.scrip.payment.PaymentPreview preview) { return payments.executeWithoutConfirmation(actorId,preview); }
     public PaymentResult confirmPayment(UUID actorId,UUID nonce) { return payments.confirm(actorId,nonce); }
+    public PaymentResult cancelPaymentPreview(UUID actorId, UUID nonce) { return payments.cancel(actorId, nonce); }
     public MaintenanceConfiguration maintenanceConfiguration() { return ledger.maintenanceConfiguration(); }
     public MaintenanceConfiguration updateMaintenanceConfiguration(UUID operationId, MaintenanceConfiguration configuration) { return ledger.updateMaintenanceConfiguration(operationId,configuration).toCompletableFuture().join(); }
     public MaintenancePreview previewMaintenance(int inactivityDays, Collection<UUID> onlinePlayers) { return ledger.previewMaintenance(inactivityDays,onlinePlayers); }

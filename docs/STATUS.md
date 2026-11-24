@@ -12,8 +12,8 @@
 **P07-D authoritative update (2026-11-14):** P07-D first-party shop economy provider contract is complete and verified.
 **P07-E authoritative update (2026-11-14):** P07-E third-party shop research is complete. No candidate has a verified delegated-economy provider interface, so no adapter was implemented. Packaged-server smoke verification is blocked by a host loopback-selector failure before mod initialization.
 **P07-F authoritative update (2026-11-14):** P07-F optional ChunkLock tax-payment contract is complete. No compiled ChunkLock adapter is included because a compatible 1.21.1 artifact and public hook are unverified. Stop after P07-F.
-**P08 authoritative update (2026-11-14):** The host Java networking blocker is resolved. Forge and NeoForge packaged servers start and pass unmodified-client reconnect probes with the documented workspace-relative Java temporary-socket override. P08 protocol implementation and matching-mod client tests remain pending.
-**Current:** P08 is unblocked but not implemented. The server command fallback remains available by design.
+**P08 authoritative update (2026-11-23):** The host Java networking blocker is resolved. P08 now implements the version-1 shared server protocol model, bounded negotiated sessions, server-side replay/rate/size enforcement, permission-filtered wallet dispatch, and optional Forge/NeoForge handshake registration. Matching-mod connection and payload-codec evidence remain pending.
+**Current:** P08 server protocol foundation is implemented but P08 is not verification-complete. The server command fallback remains available by design.
 **Technical baseline:** Minecraft Java 1.21.1, Java 21, Forge and NeoForge.
 **Next permitted packet:** A separately authorized packet only.
 **Approved backend:** Durable in-memory snapshot + append-only forced journal (ADR-0001 ACCEPTED); SQLite not in v1.  
@@ -159,6 +159,12 @@ Public research found only `chunklock-1.20.1-forge-v1.0.0.jar`; no Minecraft 1.2
 
 Verification on Java 21: `:common:test --rerun-tasks` completed successfully with 53 tests and zero failures; `build verifyArtifacts` completed successfully and verified `0.1.0-p07-f` Forge and NeoForge artifacts. Packaged Forge and NeoForge dedicated-server smoke runs were both attempted with the new artifacts, but each stopped before mod initialization with the same JDK loopback-selector failure (`Unable to establish loopback connection`). The vanilla reconnect probes must be rerun where Java loopback selectors work before release verification is complete.
 
-## P08 transport blocker resolution
+## P08 implementation record
 
-The Java loopback-selector failure was caused by the default temporary socket location. Running packaged Forge and NeoForge probes with `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=.tools/java-tmp` restores dedicated-server startup and passes both unmodified-client reconnect probes. No P08 payload code exists yet, so matching-mod negotiation, malformed-packet, size, replay, and permission tests remain pending rather than claimed. `docs/NETWORK_PROTOCOL.md` records the implementation boundary and remaining matrix.
+**P08 verification: server protocol foundation complete; matching-client matrix pending. Do not begin P09.**
+
+The Java loopback-selector failure is resolved by the documented workspace-relative temporary-socket override. The common module now provides protocol version 1, strict 8 KiB inbound bound, per-player negotiation, bounded request replay tracking, and a ten-second per-player rate limit. The server dispatcher derives actors solely from the loader connection; it permission-filters wallet snapshots, account selection, and bounded history, and only invokes existing server payment preview, confirmation, and cancellation operations.
+
+Forge uses an optional server-side channel that preserves unmodified-client access; NeoForge uses an optional server-bound payload registration. Neither dedicated-server adapter references client classes. Verification on Java 21: `:common:test` passed 55 tests with zero failures; `build verifyArtifacts` produced and verified the `0.1.0-p08` Forge and NeoForge artifacts; packaged Forge and NeoForge servers each reached readiness and passed the vanilla reconnect probe.
+
+Client request/response codecs, actual matching-mod connections, malformed transport payload checks, and the full negotiated client test matrix still require implementation and evidence. `docs/NETWORK_PROTOCOL.md` records that boundary. No wallet GUI, HUD, or client-authoritative transaction is included.
