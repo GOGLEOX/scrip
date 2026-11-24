@@ -23,7 +23,11 @@ subprojects {
     }
     tasks.withType(JavaExec).configureEach { standardInput = System.in }
     if (name != 'common') {
-        dependencies { implementation project(':common') }
+        dependencies {
+            // Forge development runs load the assembled mod JAR so shared classes are not exposed twice.
+            if (name == 'forge') compileOnly project(':common')
+            else implementation project(':common')
+        }
         sourceSets.main.java.srcDir rootProject.file('common/src/platform/java')
         tasks.named('jar', Jar) {
             from project(':common').sourceSets.main.output

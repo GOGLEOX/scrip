@@ -1,5 +1,17 @@
 plugins { id 'net.minecraftforge.gradle' version '6.0.36' }
 
+configurations.configureEach {
+    // ModLauncher requires the named Java module provided by the Minecraft 1.21.1 library.
+    resolutionStrategy.force 'net.sf.jopt-simple:jopt-simple:5.0.4'
+}
+
+sourceSets {
+    development {
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath.minus(sourceSets.main.output)
+    }
+}
+
 minecraft {
     mappings channel: 'official', version: rootProject.minecraft_version
     reobf = false
@@ -8,12 +20,9 @@ minecraft {
         configureEach {
             workingDirectory project.file('run')
             property 'forge.logging.console.level', 'info'
-            mods {
-                scrip {
-                    source sourceSets.main
-                    source project(':common').sourceSets.main
-                }
-            }
+            // Use an empty source set so ForgeGradle does not split the loader
+            // bootstrap class and mods.toml into separate development modules.
+            source sourceSets.development
         }
         client {}
         server { args '--nogui' }
@@ -21,4 +30,16 @@ minecraft {
 }
 dependencies {
     minecraft "net.minecraftforge:forge:${rootProject.minecraft_version}-${rootProject.forge_version}"
+}
+
+tasks.register('installDevelopmentMod', Copy) {
+    dependsOn tasks.named('jar')
+    from tasks.named('jar').flatMap { it.archiveFile }
+    into layout.projectDirectory.dir('run/mods')
+}
+
+tasks.configureEach { task ->
+    if (task.name == 'runClient' || task.name == 'runServer') {
+        task.dependsOn tasks.named('installDevelopmentMod')
+    }
 }
