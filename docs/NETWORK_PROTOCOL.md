@@ -8,7 +8,7 @@ P08 now has a shared protocol version, bounded request model, per-player negotia
 
 Forge registers an optional server-bound handshake channel and NeoForge registers an optional server-bound custom payload. Both use protocol version 1 and load no physical-client class on a dedicated server. Ordinary client preferences remain client-local; they are not ledger data.
 
-The existing server-only command interface remains the supported path for unmodified clients. Client-originated request/response payload codecs and actual matching-mod connection evidence are still required before optional-client features may be advertised as complete.
+The existing server-only command interface remains the supported path for unmodified clients. The NeoForge matching client/server handshake has been exercised successfully. Forge client launch is blocked before mod initialization by its development runtime failing to resolve the required `jopt.simple` Java module; client-originated request/response payload codecs and Forge matching-client evidence remain required before optional-client features may be advertised as complete.
 
 ## Approved implementation boundary after the blocker is resolved
 

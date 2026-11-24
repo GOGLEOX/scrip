@@ -20,7 +20,7 @@ import java.util.Optional;
 
 @Mod(Scrip.MOD_ID)
 public final class ScripNeoForge {
-    private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
+    static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
     private AccountLedger ledger;
     private CommandService commands;
 

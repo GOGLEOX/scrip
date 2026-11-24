@@ -114,7 +114,7 @@ The ledger commits a tax invoice identity, calculated fee, balance debit, recipi
 
 P08 defines one loader-neutral version-1 wallet protocol with an 8 KiB inbound bound, negotiated capability record, bounded replay identifiers, and per-player rate limit. A server dispatcher derives the actor from the connection, rechecks account visibility for selection/history, and reaches the established payment preview/confirmation/cancellation service instead of mutating balance state. Forge and NeoForge install optional server-bound handshakes only; neither adapter references a physical-client type on a dedicated server. Unmodified clients remain supported through commands and receive no optional payload.
 
-Client request/response codecs and the actual matching-mod connection matrix are not yet complete. `docs/NETWORK_PROTOCOL.md` records the remaining evidence; no GUI or client-authoritative rule is introduced.
+Physical-client-only handshake senders negotiate on player login. A real NeoForge client-to-server connection has exercised this path. Forge matching-client verification remains blocked by its development launcher failing before mod initialization, and client request/response codecs are not yet complete. `docs/NETWORK_PROTOCOL.md` records the remaining evidence; no GUI or client-authoritative rule is introduced.
 
 ## Approved future architecture (not implemented)
 

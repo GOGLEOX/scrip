@@ -18,7 +18,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 final class ScripNeoForgeNetwork {
     private static final ProtocolSessionRegistry SESSIONS=new ProtocolSessionRegistry();
     @SubscribeEvent static void register(RegisterPayloadHandlersEvent event){event.registrar("1").optional().playToServer(Hello.TYPE,Hello.STREAM_CODEC,ScripNeoForgeNetwork::receive);}
-    private static void receive(Hello hello,IPayloadContext context){if(context.player() instanceof ServerPlayer player)SESSIONS.negotiate(player.getUUID(),hello.version,hello.capabilities,System.currentTimeMillis());}
+    private static void receive(Hello hello,IPayloadContext context){if(context.player() instanceof ServerPlayer player && SESSIONS.negotiate(player.getUUID(),hello.version,hello.capabilities,System.currentTimeMillis()).isEmpty()) ScripNeoForge.LOGGER.info("Scrip optional wallet protocol negotiated (NeoForge)");}
     record Hello(int version,int capabilities) implements CustomPacketPayload {
         static final Type<Hello> TYPE=new Type<>(ResourceLocation.fromNamespaceAndPath(Scrip.MOD_ID,"wallet_hello"));
         static final StreamCodec<RegistryFriendlyByteBuf,Hello> STREAM_CODEC=StreamCodec.composite(ByteBufCodecs.VAR_INT,Hello::version,ByteBufCodecs.VAR_INT,Hello::capabilities,Hello::new);
