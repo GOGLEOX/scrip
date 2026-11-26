@@ -20,5 +20,5 @@ public record WalletResponse(long requestId, WalletProtocol.Response type, Optio
         error = error == null ? Optional.empty() : error;
         detail = detail == null ? Optional.empty() : detail;
     }
-    static WalletResponse error(long id, WalletProtocol.Error error) { return new WalletResponse(id, WalletProtocol.Response.ERROR_CODE, Optional.empty(), Optional.empty(), List.of(), Optional.of(error), Optional.empty()); }
+    public static WalletResponse error(long id, WalletProtocol.Error error) { return new WalletResponse(id, WalletProtocol.Response.ERROR_CODE, Optional.empty(), Optional.empty(), List.of(), Optional.of(error), Optional.empty()); }
 }

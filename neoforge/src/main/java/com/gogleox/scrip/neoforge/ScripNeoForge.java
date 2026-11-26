@@ -35,6 +35,7 @@ public final class ScripNeoForge {
     private void serverStarting(ServerStartingEvent event) {
         ledger = AccountLedger.open(event.getServer().getWorldPath(LevelResource.ROOT).resolve("scrip"), CurrencyDefinition.defaultCurrency());
         commands = new CommandService(ledger);
+        ScripNeoForgeNetwork.setCommandService(commands);
         commands.setStarterKitCompatible(ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
         commands.setFtbQuestsCompatible(ModList.get().isLoaded("ftbquests"));
     }
@@ -44,7 +45,7 @@ public final class ScripNeoForge {
     }
 
     private void serverStopping(ServerStoppingEvent event) {
-        if (ledger != null) { ledger.close(); ledger = null; commands = null; }
+        if (ledger != null) { ledger.close(); ledger = null; commands = null; ScripNeoForgeNetwork.setCommandService(null); }
     }
 
     private void playerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {

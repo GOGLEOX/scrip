@@ -36,6 +36,7 @@ public final class ScripForge {
     private void serverStarting(ServerStartingEvent event) {
         ledger = AccountLedger.open(event.getServer().getWorldPath(LevelResource.ROOT).resolve("scrip"), CurrencyDefinition.defaultCurrency());
         commands = new CommandService(ledger);
+        ScripForgeNetwork.setCommandService(commands);
         commands.setStarterKitCompatible(ModList.get().isLoaded("starterkit") && ModList.get().isLoaded("collective"));
     }
 
@@ -44,7 +45,7 @@ public final class ScripForge {
     }
 
     private void serverStopping(ServerStoppingEvent event) {
-        if (ledger != null) { ledger.close(); ledger = null; commands = null; }
+        if (ledger != null) { ledger.close(); ledger = null; commands = null; ScripForgeNetwork.setCommandService(null); }
     }
 
     private void playerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
