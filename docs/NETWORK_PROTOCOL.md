@@ -1,14 +1,14 @@
 # $crip | Optional-Client Protocol Status
 
-## P08 status: server protocol foundation implemented; request/response matrix pending
+## P08 status: verified
 
-P08 requires actual Forge and NeoForge connections for both unmodified and matching-mod clients. The packaged dedicated-server probes now start and pass the unmodified-client reconnect probe when launched with the local Java option `-Djdk.net.unixdomain.tmpdir=.tools/java-tmp`. This option keeps temporary Unix-domain sockets within a short workspace-relative path.
+P08 requires actual Forge and NeoForge connections for both unmodified and matching-mod clients. The packaged dedicated-server probes start and pass the unmodified-client reconnect probe when launched with the workspace-local Java temporary-socket override. This keeps temporary Unix-domain sockets within a short workspace-relative path.
 
 P08 now has a shared protocol version, bounded request model, per-player negotiated capability/replay/rate state, and a server dispatcher. The dispatcher takes its actor only from the loader connection, permission-filters account selection and history, and routes payment previews, confirmations, and cancellation through the existing payment service. It cannot mutate balances directly.
 
-Forge registers an optional server-bound handshake channel and NeoForge registers an optional server-bound custom payload. Both use protocol version 1 and load no physical-client class on a dedicated server. Ordinary client preferences remain client-local; they are not ledger data.
+Forge and NeoForge each register optional hello, request, and response transport. Both use protocol version 1 and load no physical-client class on a dedicated server. The shared wire codec bounds each packet, rejects malformed or trailing data, and carries no client-asserted identity. Ordinary client preferences remain client-local; they are not ledger data.
 
-The existing server-only command interface remains the supported path for unmodified clients. Forge and NeoForge matching client/server handshakes have been exercised successfully. Forge development runs load the assembled JAR and pin the Minecraft 1.21.1 `jopt.simple` module version, preventing duplicate development modules and launcher resolution failures. Client-originated request/response payload codecs remain required before optional-client features may be advertised as complete.
+The existing server-only command interface remains the supported path for unmodified clients. Matching Forge and NeoForge client/server runs have exercised protocol negotiation, a wallet-open request, and a `WALLET_SNAPSHOT` response against packaged servers. Forge development runs load the assembled JAR and pin the Minecraft 1.21.1 `jopt.simple` module version, preventing duplicate development modules and launcher resolution failures.
 
 ## Approved implementation boundary after the blocker is resolved
 
@@ -23,5 +23,5 @@ The existing server-only command interface remains the supported path for unmodi
 
 1. Forge dedicated server starts and accepts an unmodified reconnect probe.
 2. NeoForge dedicated server starts and accepts an unmodified reconnect probe.
-3. Matching client/server connections negotiate the protocol on both loaders. **Complete.**
-4. Client payload codecs exercise incorrect protocol, absent payload support, malformed/oversized packets, replay, unauthorized account selection, restart, and dedicated-server startup against those running servers.
+3. Matching client/server connections negotiate the protocol and complete a wallet-open request/response on both loaders. **Complete.**
+4. Shared protocol and codec tests cover incorrect version, absent negotiation, malformed and oversized data, replay, rate limiting, and unauthorized account selection. Restart and dedicated-server startup are covered by the packaged-server smoke runs. **Complete.**

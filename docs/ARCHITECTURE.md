@@ -112,9 +112,9 @@ The ledger commits a tax invoice identity, calculated fee, balance debit, recipi
 
 ## P08 optional-client networking status
 
-P08 defines one loader-neutral version-1 wallet protocol with an 8 KiB inbound bound, negotiated capability record, bounded replay identifiers, and per-player rate limit. A server dispatcher derives the actor from the connection, rechecks account visibility for selection/history, and reaches the established payment preview/confirmation/cancellation service instead of mutating balance state. Forge and NeoForge install optional server-bound handshakes only; neither adapter references a physical-client type on a dedicated server. Unmodified clients remain supported through commands and receive no optional payload.
+P08 defines one loader-neutral version-1 wallet protocol with an 8 KiB inbound bound, negotiated capability record, bounded replay identifiers, and per-player rate limit. A strict shared wire codec rejects oversized, malformed, and trailing data before dispatch. The server derives the actor from the connection, rechecks account visibility for selection/history, and reaches the established payment preview/confirmation/cancellation service instead of mutating balance state. Forge and NeoForge install optional request/response transports; neither adapter references a physical-client type on a dedicated server. Unmodified clients remain supported through commands and receive no optional payload.
 
-Physical-client-only handshake senders negotiate on player login. Real Forge and NeoForge client-to-server connections have exercised this path. Client request/response codecs are not yet complete. `docs/NETWORK_PROTOCOL.md` records the remaining evidence; no GUI or client-authoritative rule is introduced.
+Physical-client-only login listeners negotiate then issue a bounded wallet-open request. Real Forge and NeoForge client-to-packaged-server connections have exercised the negotiated request/response path and received a wallet snapshot. `docs/NETWORK_PROTOCOL.md` records the verification evidence. No GUI or client-authoritative rule is introduced.
 
 ## Approved future architecture (not implemented)
 
