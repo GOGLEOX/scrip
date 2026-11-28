@@ -174,6 +174,18 @@ class JournalFileLedgerStoreTest {
         assertThrows(StorageException.class, () -> JournalFileLedgerStore.open(directory));
     }
 
+    @Test void newerSnapshotSchemaFailsClosed() throws IOException {
+        try (var store = JournalFileLedgerStore.open(directory)) {
+            store.commit(operation("one", "a")).toCompletableFuture().join();
+            store.checkpoint(new VersionedSnapshot(1, 1, new byte[] {1})).toCompletableFuture().join();
+        }
+        Path snapshot = Files.list(directory).filter(path -> path.getFileName().toString().startsWith("snapshot-")).findFirst().orElseThrow();
+        try (FileChannel channel = FileChannel.open(snapshot, StandardOpenOption.WRITE)) {
+            channel.write(ByteBuffer.wrap(new byte[] {0, 0, 0, 2}), Integer.BYTES * 2L);
+        }
+        assertThrows(StorageException.class, () -> JournalFileLedgerStore.open(directory));
+    }
+
     @Test void oneBoundedWriterProducesAContinuousSequenceUnderConcurrency() throws Exception {
         try (var store = JournalFileLedgerStore.open(directory, 64, FaultInjector.NONE);
              ExecutorService callers = Executors.newFixedThreadPool(8)) {
@@ -191,6 +203,41 @@ class JournalFileLedgerStoreTest {
                 assertEquals(index + 1L, sequences.get(index));
             }
         }
+    }
+
+    @Test void backupIsConsistentDuringActivityAndRestoresOffline() {
+        Path backupRoot = directory.resolve("backups");
+        BackupReceipt backup;
+        try (var store = JournalFileLedgerStore.open(directory.resolve("live"))) {
+            store.commit(operation("one", "a")).toCompletableFuture().join();
+            backup = store.backup(backupRoot).toCompletableFuture().join();
+            store.commit(operation("two", "b")).toCompletableFuture().join();
+        }
+        BackupVerification verification = JournalFileLedgerStore.verifyBackup(backup.directory());
+        assertTrue(verification.valid(), verification.detail());
+        assertEquals(1, verification.latestSequence());
+        Path restored = directory.resolve("restored");
+        JournalFileLedgerStore.restoreBackup(backup.directory(), restored);
+        try (var restoredStore = JournalFileLedgerStore.open(restored)) {
+            assertEquals(1, restoredStore.recover().latestSequence());
+            assertEquals("one", restoredStore.recover().entries().getFirst().operation().type());
+        }
+    }
+
+    @Test void corruptedBackupAndNonemptyRestoreTargetFailClosed() throws IOException {
+        BackupReceipt backup;
+        try (var store = JournalFileLedgerStore.open(directory.resolve("live"))) {
+            store.commit(operation("one", "a")).toCompletableFuture().join();
+            backup = store.backup(directory.resolve("backups")).toCompletableFuture().join();
+        }
+        Path cleanTarget = directory.resolve("nonempty");
+        Files.createDirectories(cleanTarget);
+        Files.writeString(cleanTarget.resolve("keep"), "do not overwrite");
+        assertThrows(StorageException.class, () -> JournalFileLedgerStore.restoreBackup(backup.directory(), cleanTarget));
+
+        Files.write(backup.directory().resolve("ledger.journal"), new byte[] {99}, StandardOpenOption.APPEND);
+        assertFalse(JournalFileLedgerStore.verifyBackup(backup.directory()).valid());
+        assertThrows(StorageException.class, () -> JournalFileLedgerStore.restoreBackup(backup.directory(), directory.resolve("target")));
     }
 
     private static JournalOperation operation(String type, String payload) {

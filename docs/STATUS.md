@@ -21,6 +21,8 @@
 **Approved maintenance scope:** Configurable automatic stale-account cleanup and admin preview/run/status/config, journal compact/verify (ADR-0002).  
 **Named integrations:** Serilum Starter Kit Forge+NeoForge, FTB Quests NeoForge 1.21.1, future first-party GOGLEOX shop hook both, ChunkLock objective and generic bridge.
 
+**P10 update (2026-11-27):** Storage-level verified local backups, offline restore validation, checkpoint replay, newer-schema rejection, and asynchronous administrator backup create/status/verify commands are implemented and covered by regression tests. P10 remains **BLOCKED**: account checkpoints currently retain the canonical replay history and are limited by the snapshot payload bound, so they are not yet a production-safe compact state format for long-running backup rotation, scheduling, retention deletion, or journal segment retirement. The v1.5 specification and packet source have been reviewed from the supplied reference bundle. No destructive journal operation has been exposed.
+
 ## Suggested settings, not yet code
 365-day inactivity, every 24 hours, auto enabled, bounded batch; zero-balance personal accounts only. Positive-balance and organization-related accounts are not automatically closed. Journal segments compacted only after verified durable snapshot. See `docs/MAINTENANCE_AND_CLEANUP.md`.
 

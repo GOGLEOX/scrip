@@ -47,4 +47,21 @@ class AccountLedgerTest {
             assertEquals(2,l.administrativeAudit().size());
         }
     }
+    @Test void checkpointReplaysAccountsClaimsAndPostCheckpointOperations() {
+        UUID claimOwner=UUID.fromString("00000000-0000-0000-0000-000000000004");
+        try(AccountLedger l=AccountLedger.open(directory,CurrencyDefinition.defaultCurrency())) {
+            AccountId alice=l.registerPlayer(ALICE,"Alice").toCompletableFuture().join().id();
+            l.registerPlayer(BOB,"Bob").toCompletableFuture().join();
+            l.adjust(new AdjustmentRequest(UUID.randomUUID(),alice,75,"seed")).toCompletableFuture().join();
+            assertTrue(l.recordPermanentClaim("starter_grant:"+claimOwner).toCompletableFuture().join());
+            long checkpoint=l.checkpoint().toCompletableFuture().join().sequence();
+            assertTrue(checkpoint>0);
+            l.adjust(new AdjustmentRequest(UUID.randomUUID(),alice,25,"after checkpoint")).toCompletableFuture().join();
+        }
+        try(AccountLedger l=AccountLedger.open(directory,CurrencyDefinition.defaultCurrency())) {
+            assertEquals(100,l.findPersonal(ALICE).orElseThrow().balance().units());
+            assertTrue(l.hasPermanentClaim("starter_grant:"+claimOwner));
+            assertTrue(l.findPersonal(BOB).isPresent());
+        }
+    }
 }

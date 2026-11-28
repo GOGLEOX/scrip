@@ -44,6 +44,8 @@ public final class AccountLedger implements AutoCloseable {
     private final Map<AccountId, OrganizationId> organizationAccounts=new HashMap<>();
     private final Deque<OrganizationAuditRecord> organizationAudit=new ArrayDeque<>();
     private final Map<UUID,Integer> organizationMembershipCounts=new HashMap<>();
+    /** Canonical replay history captured by an account checkpoint; retained until P10-M proves safe segment retirement. */
+    private final List<JournalEntry> durableHistory=new ArrayList<>();
     private CurrencyDefinition currency; private MaintenanceConfiguration maintenanceConfiguration=MaintenanceConfiguration.defaults(); private PaymentPolicy paymentPolicy=PaymentPolicy.defaults(); private RewardConfiguration rewardConfiguration=RewardConfiguration.defaults(); private long feeReserve; private boolean closed;
 
     public static AccountLedger open(Path directory, CurrencyDefinition currency) { return new AccountLedger(JournalFileLedgerStore.open(directory),currency,Clock.systemUTC()); }
@@ -55,13 +57,36 @@ public final class AccountLedger implements AutoCloseable {
     }
     private void recover(CurrencyDefinition requested) {
         RecoveryState recovered=store.recover();
-        if(recovered.snapshot().isPresent()) throw new StorageException("Account snapshots are not supported before checkpoint integration");
-        for(JournalEntry entry:recovered.entries()) replay(entry);
+        recovered.snapshot().ifPresent(snapshot->{
+            if(snapshot.schemaVersion()!=1) throw new StorageException("Unsupported account snapshot schema");
+            List<JournalEntry> checkpointEntries=decodeCheckpoint(snapshot);
+            for(JournalEntry entry:checkpointEntries) replay(entry);
+            durableHistory.addAll(checkpointEntries);
+        });
+        for(JournalEntry entry:recovered.entries()) { replay(entry); durableHistory.add(entry); }
         if(currency==null) { currency=requested; durable(new JournalOperation(UUID.randomUUID(),INIT,encode(out->out.writeUTF(requested.displayName())))); }
         else if(!currency.equals(requested)) throw new StorageException("World currency does not match its durable configuration");
     }
 
+    /** Writes an immutable recovery checkpoint after all previously submitted ledger operations. */
+    public CompletionStage<SnapshotReceipt> checkpoint() { return submit(()->{
+        long sequence=durableHistory.isEmpty()?0:durableHistory.getLast().sequence();
+        if(sequence==0) throw new StorageException("Cannot checkpoint an empty ledger");
+        return store.checkpoint(new VersionedSnapshot(1,sequence,encodeCheckpoint(durableHistory))).toCompletableFuture().join();
+    }); }
+
     public CurrencyDefinition currency() { synchronized(this){return currency;} }
+    /** Starts a verified backup on the persistence writer; callers must not block a server tick waiting for it. */
+    public CompletionStage<BackupReceipt> backup() {
+        if (!(store instanceof JournalFileLedgerStore journal)) {
+            return CompletableFuture.failedFuture(new StorageException("This ledger store does not support local backups"));
+        }
+        return journal.backup(journal.backupRoot());
+    }
+    public CompletionStage<Optional<BackupVerification>> verifyLatestBackup() {
+        if (!(store instanceof JournalFileLedgerStore journal)) return CompletableFuture.completedFuture(Optional.empty());
+        return journal.verifyLatestBackup();
+    }
     public PaymentPolicy paymentPolicy() { synchronized(this){return paymentPolicy;} }
     public long feeReserve() { synchronized(this){return feeReserve;} }
     public RewardConfiguration rewardConfiguration() { synchronized(this){return rewardConfiguration;} }
@@ -224,7 +249,7 @@ public final class AccountLedger implements AutoCloseable {
         OrganizationState organization=organizations.get(id);if(organization==null)return TransferOutcome.rejected(TransferOutcome.Status.UNKNOWN_ACCOUNT,operationId);OrganizationRole role=organization.members.get(actorId);if(role==null||!role.canSpendFunds())return TransferOutcome.rejected(TransferOutcome.Status.UNAUTHORIZED,operationId);return transferNow(new TransferRequest(operationId,organization.account,destination,amount),true);
     });}
 
-    private CommitReceipt durable(JournalOperation operation){try{return store.commit(operation).toCompletableFuture().join();}catch(CompletionException exception){throw new StorageException("Durable ledger commit failed",exception.getCause());}}
+    private CommitReceipt durable(JournalOperation operation){try{CommitReceipt receipt=store.commit(operation).toCompletableFuture().join();durableHistory.add(new JournalEntry(receipt.sequence(),operation));return receipt;}catch(CompletionException exception){throw new StorageException("Durable ledger commit failed",exception.getCause());}}
     private <T> CompletionStage<T> submit(Callable<T> task){CompletableFuture<T> result=new CompletableFuture<>();synchronized(this){if(closed){result.completeExceptionally(new StorageException("Account ledger is closed"));return result;}}try{writer.execute(()->{try{result.complete(task.call());}catch(Throwable throwable){result.completeExceptionally(throwable);}});}catch(RuntimeException exception){result.completeExceptionally(exception);}return result;}
     private void replay(JournalEntry entry){try(DataInputStream in=new DataInputStream(new ByteArrayInputStream(entry.operation().payload()))){switch(entry.operation().type()){
         case INIT -> currency=new CurrencyDefinition(in.readUTF());
@@ -292,6 +317,14 @@ public final class AccountLedger implements AutoCloseable {
     private static ShopSettlement readShopSettlement(DataInputStream in)throws IOException{return new ShopSettlement(in.readUTF(),readUuid(in),readId(in),readId(in),in.readLong(),in.readLong(),in.readLong(),readTime(in),readUuid(in),readUuid(in),readSettlementState(in));}
     private static SettlementState readSettlementState(DataInputStream in)throws IOException{int ordinal=in.readInt();SettlementState[] states=SettlementState.values();if(ordinal<0||ordinal>=states.length)throw new StorageException("Invalid settlement state");return states[ordinal];}
     private static byte[] encode(Encoder encoder){try{ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(DataOutputStream out=new DataOutputStream(bytes)){encoder.write(out);}return bytes.toByteArray();}catch(IOException exception){throw new IllegalStateException(exception);}}
+    /**
+     * Checkpoints deliberately contain the exact verified operation sequence rather than a second mutable
+     * account serialization. This keeps balances, organizations, permanent claims, idempotency records and
+     * pending settlements on one replay path until P10-M can prove segment retirement against a compact state
+     * snapshot. The enclosing storage format bounds this payload to one MiB and forces it before publication.
+     */
+    private static byte[] encodeCheckpoint(List<JournalEntry> entries){return encode(out->{out.writeInt(entries.size());for(JournalEntry entry:entries){out.writeLong(entry.sequence());writeUuid(out,entry.operation().operationId());out.writeUTF(entry.operation().type());byte[] payload=entry.operation().payload();out.writeInt(payload.length);out.write(payload);}});}
+    private static List<JournalEntry> decodeCheckpoint(VersionedSnapshot snapshot){try(DataInputStream in=new DataInputStream(new ByteArrayInputStream(snapshot.state()))){int count=in.readInt();if(count<1||count>100_000)throw new StorageException("Invalid account checkpoint entry count");List<JournalEntry> entries=new ArrayList<>(count);long previous=0;Set<UUID> ids=new HashSet<>();for(int index=0;index<count;index++){long sequence=in.readLong();UUID id=readUuid(in);String type=in.readUTF();if(type.isBlank()||type.length()>128)throw new StorageException("Invalid account checkpoint operation type");int length=in.readInt();if(length<0||length>1_048_576)throw new StorageException("Invalid account checkpoint payload length");byte[] payload=in.readNBytes(length);if(payload.length!=length||sequence<=previous||!ids.add(id))throw new StorageException("Invalid account checkpoint ordering");entries.add(new JournalEntry(sequence,new JournalOperation(id,type,payload)));previous=sequence;}if(in.available()!=0||previous!=snapshot.sequence())throw new StorageException("Account checkpoint sequence does not match payload");return List.copyOf(entries);}catch(IOException|IllegalArgumentException exception){throw new StorageException("Cannot decode account checkpoint",exception);}}
     private static void writeUuid(DataOutputStream out,UUID id)throws IOException{out.writeLong(id.getMostSignificantBits());out.writeLong(id.getLeastSignificantBits());}
     private static UUID readUuid(DataInputStream in)throws IOException{return new UUID(in.readLong(),in.readLong());}
     private static void writeId(DataOutputStream out,AccountId id)throws IOException{writeUuid(out,id.value());}

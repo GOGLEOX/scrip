@@ -31,6 +31,12 @@
 - Server branding is restricted to a bounded display name and an optional resource-pack texture identifier. Do not add raw file uploads, remote downloads, client-provided branding, or arbitrary asset bytes to the wallet protocol.
 - The wallet has a content-safe minimum size rather than compressing payment fields or confirmation controls below readable bounds.
 - NeoForge optional payload registration is public and version-aligned with the shared wallet protocol. This is required for the loader to advertise the server-bound handshake payload before the client sends it; package-private registration previously produced a client login disconnect rather than a safe optional-client fallback.
+
+## P10 backup and migration safety | 2026-11-27
+
+- A backup is a self-contained, SHA-256-manifested copy made by the journal writer after all preceding durable writes. Restore is offline-only into an empty target and verifies the copied data before acknowledging success.
+- A snapshot newer than the server-supported schema and a migration gap are fail-closed conditions. Future migrations must be explicit adjacent immutable transformations; no best-effort or silent defaulting is allowed.
+- Account-ledger checkpoints replay the canonical durable operation sequence and preserve balances, organization funds, claims, idempotency keys, and pending settlements. The representation is not a compact state snapshot, so it cannot justify long-term rotation, scheduled backup retention deletion, or journal segment retirement. Those operations remain unavailable rather than risking recovery integrity.
 - Supported OS/filesystem and filesystem atomic-rename fallback; backup schedule/retention.
 - Explicit nonzero-balance forfeiture/sweep requires separate user authorization and is not in v1.
 

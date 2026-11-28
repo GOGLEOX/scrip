@@ -13,10 +13,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -40,6 +44,8 @@ public final class JournalFileLedgerStore implements LedgerStore {
     private static final int MAX_RECORD_BYTES = 1_048_576;
     private static final String JOURNAL_NAME = "ledger.journal";
     private static final String MANIFEST_NAME = "checkpoint.manifest";
+    private static final String BACKUP_MANIFEST_NAME = "backup.manifest";
+    private static final String BACKUP_MAGIC = "SCRIP_BACKUP_V1";
 
     private final Path directory;
     private final Path journal;
@@ -85,6 +91,97 @@ public final class JournalFileLedgerStore implements LedgerStore {
         }
         store.nextSequence = recovery.latestSequence() + 1;
         return store;
+    }
+
+    /** Root reserved for verified backups; it is never replayed as ledger state. */
+    public Path backupRoot() { return directory.resolve("backups"); }
+
+    public CompletionStage<Optional<BackupVerification>> verifyLatestBackup() {
+        return CompletableFuture.supplyAsync(() -> {
+            Path root = backupRoot();
+            if (!Files.isDirectory(root)) return Optional.empty();
+            try (var candidates = Files.list(root)) {
+                Optional<Path> latest = candidates.filter(Files::isDirectory)
+                        .filter(path -> Files.isRegularFile(path.resolve(BACKUP_MANIFEST_NAME)))
+                        .max(java.util.Comparator.comparing(path -> path.getFileName().toString()));
+                return latest.map(JournalFileLedgerStore::verifyBackup);
+            } catch (IOException exception) {
+                throw new StorageException("Cannot inspect backup status", exception);
+            }
+        });
+    }
+
+    /**
+     * Creates a point-in-time backup after every write already queued before it. The writer lock prevents an
+     * append or checkpoint from changing source files while their digests are calculated and copied.
+     */
+    public CompletionStage<BackupReceipt> backup(Path backupRoot) {
+        Objects.requireNonNull(backupRoot, "backupRoot");
+        CompletableFuture<BackupReceipt> result = new CompletableFuture<>();
+        synchronized (this) {
+            if (closed || failed) {
+                result.completeExceptionally(new StorageException("Ledger store is unavailable"));
+                return result;
+            }
+            try {
+                writer.execute(() -> writeBackup(backupRoot, result));
+            } catch (RuntimeException exception) {
+                result.completeExceptionally(new StorageException("Journal writer queue is full", exception));
+            }
+        }
+        return result;
+    }
+
+    /** Validates a backup without modifying it. Invalid manifests and hashes fail closed. */
+    public static BackupVerification verifyBackup(Path backupDirectory) {
+        try {
+            BackupManifest manifest = readBackupManifest(backupDirectory.resolve(BACKUP_MANIFEST_NAME));
+            List<String> names = new ArrayList<>();
+            for (BackupFile file : manifest.files()) {
+                Path path = safeChild(backupDirectory, file.name());
+                if (!Files.isRegularFile(path) || !sha256(path).equals(file.sha256())) {
+                    throw new StorageException("Backup file checksum failed: " + file.name());
+                }
+                names.add(file.name());
+            }
+            Path journal = safeChild(backupDirectory, JOURNAL_NAME);
+            if (!Files.exists(journal)) throw new StorageException("Backup is missing the committed journal");
+            try (JournalFileLedgerStore store = JournalFileLedgerStore.open(backupDirectory)) {
+                VerificationReport report = store.verify();
+                if (report.latestSequence() != manifest.latestSequence()) {
+                    throw new StorageException("Backup journal sequence does not match manifest");
+                }
+            }
+            return new BackupVerification(true, manifest.latestSequence(), manifest.checkpointSequence(), manifest.createdAt(), names, "verified");
+        } catch (IOException | RuntimeException exception) {
+            return new BackupVerification(false, 0, 0, Instant.EPOCH, List.of(), exception.getMessage() == null ? "backup verification failed" : exception.getMessage());
+        }
+    }
+
+    /**
+     * Offline restore only. The target must not contain ledger data; this method never replaces a live world.
+     */
+    public static BackupReceipt restoreBackup(Path backupDirectory, Path targetDirectory) {
+        BackupVerification verification = verifyBackup(backupDirectory);
+        if (!verification.valid()) throw new StorageException("Backup is not restorable: " + verification.detail());
+        try {
+            if (Files.exists(targetDirectory)) {
+                try (var contents = Files.list(targetDirectory)) {
+                    if (contents.findAny().isPresent()) throw new StorageException("Restore target must be empty");
+                }
+            }
+            Files.createDirectories(targetDirectory);
+            for (String name : verification.files()) {
+                Files.copy(safeChild(backupDirectory, name), safeChild(targetDirectory, name), StandardCopyOption.COPY_ATTRIBUTES);
+            }
+            try (JournalFileLedgerStore restored = JournalFileLedgerStore.open(targetDirectory)) {
+                VerificationReport report = restored.verify();
+                if (report.latestSequence() != verification.latestSequence()) throw new StorageException("Restored sequence does not match backup");
+            }
+            return new BackupReceipt(targetDirectory, verification.latestSequence(), verification.checkpointSequence(), verification.createdAt());
+        } catch (IOException exception) {
+            throw new StorageException("Offline restore failed", exception);
+        }
     }
 
     @Override
@@ -215,6 +312,50 @@ public final class JournalFileLedgerStore implements LedgerStore {
                 result.completeExceptionally(new StorageException("Checkpoint was not acknowledged", exception));
             }
         }
+    }
+
+    private void writeBackup(Path backupRoot, CompletableFuture<BackupReceipt> result) {
+        synchronized (this) {
+            Path temporary = null;
+            try {
+                Files.createDirectories(backupRoot);
+                Replay replay = readJournal(false);
+                Optional<VersionedSnapshot> snapshot = readCommittedSnapshot();
+                long checkpoint = snapshot.map(VersionedSnapshot::sequence).orElse(0L);
+                long latest = Math.max(checkpoint, replay.latestSequence());
+                Instant created = Instant.now();
+                String backupName = "backup-" + latest + "-" + created.toEpochMilli();
+                Path target = safeChild(backupRoot, backupName);
+                if (Files.exists(target)) throw new StorageException("Backup target already exists");
+                temporary = Files.createTempDirectory(backupRoot, ".backup-");
+                List<BackupFile> files = new ArrayList<>();
+                copyBackupFile(journal, temporary, JOURNAL_NAME, files);
+                if (Files.exists(manifest)) {
+                    CheckpointManifest checkpointManifest = readManifest(manifest);
+                    copyBackupFile(directory.resolve(checkpointManifest.snapshotFile()), temporary, checkpointManifest.snapshotFile(), files);
+                    copyBackupFile(manifest, temporary, MANIFEST_NAME, files);
+                }
+                writeBackupManifest(temporary.resolve(BACKUP_MANIFEST_NAME), new BackupManifest(created, latest, checkpoint, files));
+                verifyBackupOrThrow(temporary);
+                moveReplace(temporary, target);
+                temporary = null;
+                result.complete(new BackupReceipt(target, latest, checkpoint, created));
+            } catch (IOException | RuntimeException exception) {
+                result.completeExceptionally(new StorageException("Backup was not acknowledged", exception));
+            } finally {
+                if (temporary != null) {
+                    try { deleteTree(temporary); } catch (IOException ignored) { }
+                }
+            }
+        }
+    }
+
+    private static void copyBackupFile(Path source, Path destinationDirectory, String name, List<BackupFile> files) throws IOException {
+        if (!Files.isRegularFile(source)) throw new StorageException("Backup source is missing: " + name);
+        Path destination = safeChild(destinationDirectory, name);
+        Files.copy(source, destination, StandardCopyOption.COPY_ATTRIBUTES);
+        try (FileChannel channel = FileChannel.open(destination, StandardOpenOption.WRITE)) { channel.force(true); }
+        files.add(new BackupFile(name, sha256(destination)));
     }
 
     private RecoveryState readRecovery(boolean repairTail) {
@@ -447,6 +588,9 @@ public final class JournalFileLedgerStore implements LedgerStore {
                 throw new StorageException("Unsupported snapshot format");
             }
             int schema = in.readInt();
+            if (schema > FORMAT_VERSION) {
+                throw new StorageException("Snapshot schema is newer than this server supports");
+            }
             long sequence = in.readLong();
             byte[] state = readSized(in, MAX_RECORD_BYTES);
             int actual = in.readInt();
@@ -505,6 +649,82 @@ public final class JournalFileLedgerStore implements LedgerStore {
         }
     }
 
+    private static Path safeChild(Path parent, String name) {
+        if (name == null || name.isBlank() || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.contains("..")) {
+            throw new StorageException("Invalid backup file name");
+        }
+        Path normalizedParent = parent.toAbsolutePath().normalize();
+        Path child = normalizedParent.resolve(name).normalize();
+        if (!child.getParent().equals(normalizedParent)) throw new StorageException("Backup path escapes its directory");
+        return child;
+    }
+
+    private static String sha256(Path path) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (var input = Files.newInputStream(path)) {
+                byte[] buffer = new byte[8192];
+                for (int read; (read = input.read(buffer)) >= 0;) digest.update(buffer, 0, read);
+            }
+            return java.util.HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    private static void writeBackupManifest(Path path, BackupManifest backup) throws IOException {
+        List<String> lines = new ArrayList<>();
+        lines.add(BACKUP_MAGIC);
+        lines.add("created=" + backup.createdAt().toEpochMilli());
+        lines.add("latest=" + backup.latestSequence());
+        lines.add("checkpoint=" + backup.checkpointSequence());
+        for (BackupFile file : backup.files()) lines.add("file=" + file.name() + ":" + file.sha256());
+        Files.write(path, lines, java.nio.charset.StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE)) { channel.force(true); }
+    }
+
+    private static BackupManifest readBackupManifest(Path path) {
+        try {
+            List<String> lines = Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
+            if (lines.size() < 5 || !BACKUP_MAGIC.equals(lines.getFirst())) throw new StorageException("Unsupported backup manifest");
+            long created = readManifestLong(lines.get(1), "created=");
+            long latest = readManifestLong(lines.get(2), "latest=");
+            long checkpoint = readManifestLong(lines.get(3), "checkpoint=");
+            List<BackupFile> files = new ArrayList<>();
+            for (String line : lines.subList(4, lines.size())) {
+                if (!line.startsWith("file=")) throw new StorageException("Invalid backup manifest record");
+                String[] parts = line.substring(5).split(":", -1);
+                if (parts.length != 2 || !parts[1].matches("[0-9a-f]{64}")) throw new StorageException("Invalid backup checksum entry");
+                safeChild(path.getParent(), parts[0]);
+                files.add(new BackupFile(parts[0], parts[1]));
+            }
+            if (files.stream().noneMatch(file -> JOURNAL_NAME.equals(file.name()))) throw new StorageException("Backup manifest lacks journal");
+            return new BackupManifest(Instant.ofEpochMilli(created), latest, checkpoint, files);
+        } catch (IOException | NumberFormatException exception) {
+            throw new StorageException("Cannot read backup manifest", exception);
+        }
+    }
+
+    private static long readManifestLong(String line, String prefix) {
+        if (!line.startsWith(prefix)) throw new StorageException("Invalid backup manifest field");
+        long value = Long.parseLong(line.substring(prefix.length()));
+        if (value < 0) throw new StorageException("Negative backup manifest sequence");
+        return value;
+    }
+
+    private static void verifyBackupOrThrow(Path directory) {
+        BackupVerification verification = verifyBackup(directory);
+        if (!verification.valid()) throw new StorageException("Backup verification failed: " + verification.detail());
+    }
+
+    private static void deleteTree(Path directory) throws IOException {
+        try (var paths = Files.walk(directory)) {
+            paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                try { Files.deleteIfExists(path); } catch (IOException exception) { throw new StorageException("Cannot remove incomplete backup", exception); }
+            });
+        }
+    }
+
     private static int checksum(byte[] bytes) {
         CRC32 crc = new CRC32();
         crc.update(bytes);
@@ -535,4 +755,13 @@ public final class JournalFileLedgerStore implements LedgerStore {
     private record Replay(List<JournalEntry> entries, long latestSequence, boolean truncatedTail) {}
 
     private record CheckpointManifest(String snapshotFile, long sequence, int snapshotChecksum) {}
+
+    private record BackupManifest(Instant createdAt, long latestSequence, long checkpointSequence, List<BackupFile> files) {
+        private BackupManifest {
+            if (latestSequence < 0 || checkpointSequence < 0 || checkpointSequence > latestSequence) throw new StorageException("Invalid backup manifest sequences");
+            files = List.copyOf(files);
+        }
+    }
+
+    private record BackupFile(String name, String sha256) {}
 }

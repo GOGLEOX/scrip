@@ -81,6 +81,8 @@ public final class CommandService {
     public MaintenanceConfiguration updateMaintenanceConfiguration(UUID operationId, MaintenanceConfiguration configuration) { return ledger.updateMaintenanceConfiguration(operationId,configuration).toCompletableFuture().join(); }
     public MaintenancePreview previewMaintenance(int inactivityDays, Collection<UUID> onlinePlayers) { return ledger.previewMaintenance(inactivityDays,onlinePlayers); }
     public JournalMaintenancePreview journalMaintenancePreview() { return ledger.journalMaintenancePreview(); }
+    public java.util.concurrent.CompletionStage<com.gogleox.scrip.storage.BackupReceipt> backup() { return ledger.backup(); }
+    public java.util.concurrent.CompletionStage<java.util.Optional<com.gogleox.scrip.storage.BackupVerification>> verifyLatestBackup() { return ledger.verifyLatestBackup(); }
     /** Command adapter has already authenticated an administrator; only allow registered command-enabled sources. */
     public IntegrationRewardResponse integrationReward(String source,String claimId,UUID recipient,long amount) { return trustedRewardSources.find(source).filter(TrustedRewardSource::commandAllowed).map(ignored->economy.issueReward(new IntegrationRewardRequest(source,claimId,recipient,amount)).toCompletableFuture().join()).orElseGet(()->new IntegrationRewardResponse(IntegrationRewardResponse.Status.UNAUTHORIZED_SOURCE,null,java.util.OptionalLong.empty())); }
     /** Executes only from Starter Kit's server command source after its player entity was independently resolved. */

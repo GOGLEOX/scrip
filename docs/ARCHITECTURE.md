@@ -124,6 +124,12 @@ The client owns local presentation state: theme, HUD visibility, position, scale
 
 Server branding uses bounded JVM configuration values: `scrip.wallet.name` and an optional `scrip.wallet.icon` resource location. Branding travels inside the negotiated wallet snapshot and is validated before use. Icons are resolved only from installed or server-provided resource packs; the protocol does not accept arbitrary uploaded files or remote asset URLs.
 
+## P10 backup and migration status
+
+`JournalFileLedgerStore` can create a point-in-time local backup from its serialized writer, after all previously acknowledged writes and before any later write. Each backup carries a bounded manifest with per-file SHA-256 digests and is verified before offline restore into an empty directory. The validation path reopens and verifies the copied journal, so a missing journal, digest mismatch, malformed frame, or corrupt data fails closed.
+
+Snapshot migration contracts are deterministic adjacent-schema transformations and reject a snapshot newer than the running server. Account-ledger checkpoints replay the same durable operation sequence used for normal recovery, including accounts, organizations, claims, idempotency records, and settlement state. The operation-history representation is bounded by the storage snapshot payload and cannot serve as the final compact long-term state format. Therefore P10 exposes only non-blocking administrator backup create/status/verify commands; backup scheduling, retention deletion, and journal segment retirement remain unavailable until compact state serialization and migration execution are proven.
+
 ## Approved future architecture (not implemented)
 
 - Target Minecraft Java 1.21.1, Java 21; separate Forge and NeoForge jars from shared domain source.

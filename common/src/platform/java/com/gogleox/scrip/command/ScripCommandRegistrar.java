@@ -11,6 +11,8 @@ import com.gogleox.scrip.maintenance.MaintenanceExclusion;
 import com.gogleox.scrip.maintenance.MaintenancePreview;
 import com.gogleox.scrip.payment.PaymentPreview;
 import com.gogleox.scrip.payment.PaymentResult;
+import com.gogleox.scrip.storage.BackupReceipt;
+import com.gogleox.scrip.storage.BackupVerification;
 import com.mojang.logging.LogUtils;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
@@ -66,6 +68,7 @@ public final class ScripCommandRegistrar {
                         .then(Commands.argument("player", GameProfileArgument.gameProfile())
                                 .executes(this::audit)))
                 .then(cleanupMaintenance())
+                .then(backupMaintenance())
                 .then(journalMaintenance());
         dispatcher.register(Commands.literal(name)
                 .then(Commands.literal("balance").executes(this::ownBalance)
@@ -114,6 +117,12 @@ public final class ScripCommandRegistrar {
                         .then(Commands.literal("preview").executes(this::journalPreview))
                         .then(Commands.literal("run").executes(this::notImplemented)))
                 .then(Commands.literal("verify").executes(this::journalVerify));
+    }
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> backupMaintenance() {
+        return Commands.literal("backup")
+                .then(Commands.literal("create").executes(this::backupCreate))
+                .then(Commands.literal("status").executes(this::backupStatus))
+                .then(Commands.literal("verify").executes(this::backupVerify));
     }
     private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> integration() {
         return Commands.literal("integration").then(Commands.literal("reward")
@@ -170,6 +179,27 @@ public final class ScripCommandRegistrar {
         Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
         try { JournalMaintenancePreview preview=service.get().journalMaintenancePreview(); return success(context,"Journal verified: sequence="+preview.latestSequence()+", replay-entries="+preview.replayEntryCount()+", checkpoint="+preview.hasCheckpoint()+"."); }
         catch(RuntimeException exception) { return failure(context,"Journal verification failed."); }
+    }
+    private int backupCreate(CommandContext<CommandSourceStack> context) {
+        Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
+        CommandSourceStack source=context.getSource();
+        service.get().backup().whenComplete((receipt,error)->source.getServer().execute(()->{
+            if(error!=null) failure(source,"Backup failed; existing ledger data was not changed.");
+            else success(source,"Backup verified at durable sequence "+receipt.latestSequence()+".");
+        }));
+        return success(context,"Backup queued. Status will be reported when verification completes.");
+    }
+    private int backupStatus(CommandContext<CommandSourceStack> context) { return reportBackup(context,"Backup status"); }
+    private int backupVerify(CommandContext<CommandSourceStack> context) { return reportBackup(context,"Backup verification"); }
+    private int reportBackup(CommandContext<CommandSourceStack> context,String label) {
+        Optional<CommandService> service=commands.get(); if(service.isEmpty()) return failure(context,"Scrip is not ready.");
+        CommandSourceStack source=context.getSource();
+        service.get().verifyLatestBackup().whenComplete((result,error)->source.getServer().execute(()->{
+            if(error!=null) failure(source,label+" failed.");
+            else if(result.isEmpty()) success(source,"No verified backup exists yet.");
+            else { BackupVerification backup=result.orElseThrow(); if(backup.valid()) success(source,label+": valid sequence="+backup.latestSequence()+", checkpoint="+backup.checkpointSequence()+"."); else failure(source,label+" failed: "+backup.detail()); }
+        }));
+        return success(context,label+" queued.");
     }
     private int notImplemented(CommandContext<CommandSourceStack> context) { return failure(context,"NOT_IMPLEMENTED: available in P10-M."); }
     private int configuredDays(CommandContext<CommandSourceStack> context) { return commands.get().map(service -> service.maintenanceConfiguration().inactivityDays()).orElse(MaintenanceConfiguration.defaults().inactivityDays()); }
@@ -260,5 +290,7 @@ public final class ScripCommandRegistrar {
     }; }
     private static int success(CommandContext<CommandSourceStack> context, String message) { context.getSource().sendSuccess(() -> Component.literal(message), false); return 1; }
     private static int failure(CommandContext<CommandSourceStack> context, String message) { context.getSource().sendFailure(Component.literal(message)); return 0; }
+    private static int success(CommandSourceStack source, String message) { source.sendSuccess(() -> Component.literal(message), false); return 1; }
+    private static int failure(CommandSourceStack source, String message) { source.sendFailure(Component.literal(message)); return 0; }
     private record Target(UUID id, String name) {}
 }
