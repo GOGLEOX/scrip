@@ -55,6 +55,6 @@ public final class ScripForge {
     }
 
     private void registerCommands(RegisterCommandsEvent event) {
-        new ScripCommandRegistrar(() -> Optional.ofNullable(commands)).register(event.getDispatcher(), System.getProperty("scrip.command.aliases", ""));
+        new ScripCommandRegistrar(() -> Optional.ofNullable(commands), ScripForgeNetwork::requestWalletOpen, ScripForgeNetwork::refreshWallet).register(event.getDispatcher(), System.getProperty("scrip.command.aliases", ""));
     }
 }

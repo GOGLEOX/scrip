@@ -40,6 +40,10 @@ public final class CommandService {
     public void setFtbQuestsCompatible(boolean compatible) { ftbQuestsCompatible=compatible; }
     public Optional<AccountSnapshot> balance(UUID playerId) { return ledger.findPersonal(playerId); }
     public Optional<AccountSnapshot> balanceByVerifiedPlayer(UUID playerId) { return ledger.findPersonal(playerId); }
+    /** Resolves only a server-recorded player name; arbitrary client UUIDs are never accepted. */
+    public Optional<AccountSnapshot> balanceByVerifiedName(String name) { if(name==null||name.length()>16||!name.matches("[A-Za-z0-9_]+"))return Optional.empty(); return ledger.findKnownPlayer(name).flatMap(player -> ledger.findPersonal(player.playerId())); }
+    /** Returns only server-derived accounts the current actor may view or spend from. */
+    public List<com.gogleox.scrip.organization.AccountAccess> accessibleAccounts(UUID actorId) { return ledger.accessibleAccounts(actorId); }
     /** Returns an account only when the authenticated actor may view it. */
     public Optional<AccountSnapshot> accountForActor(UUID actorId, com.gogleox.scrip.account.AccountId accountId) {
         return ledger.accessibleAccounts(actorId).stream().anyMatch(access -> access.accountId().equals(accountId))
@@ -52,7 +56,9 @@ public final class CommandService {
     /** Bounded account history after server-side view authorization. */
     public List<TransactionRecord> historyForActor(UUID actorId, com.gogleox.scrip.account.AccountId accountId, int limit) {
         if (limit < 1 || limit > 100 || accountForActor(actorId, accountId).isEmpty()) return List.of();
-        return ledger.history(accountId).stream().limit(limit).toList();
+        return ledger.history(accountId).stream().limit(limit).map(record -> record.counterparty().flatMap(ledger::accountDisplayName)
+                .map(name -> new TransactionRecord(record.operationId(),record.occurredAt(),record.direction(),record.counterparty(),record.amount(),record.description()+" "+switch(record.direction()){case INCOMING -> "from "+name;case OUTGOING -> "to "+name;default -> "with "+name;}))
+                .orElse(record)).toList();
     }
     public TransferOutcome pay(UUID senderId, UUID recipientId, long amount, UUID operationId) {
         Optional<AccountSnapshot> sender = balance(senderId), recipient = balanceByVerifiedPlayer(recipientId);

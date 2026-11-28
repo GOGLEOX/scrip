@@ -139,6 +139,12 @@ public final class AccountLedger implements AutoCloseable {
     public Optional<AccountSnapshot> findPersonal(UUID playerId) { synchronized(this){return Optional.ofNullable(personal.get(playerId)).map(accounts::get).map(this::snapshot);} }
     public Optional<AccountSnapshot> findAccount(AccountId id) { synchronized(this){return Optional.ofNullable(accounts.get(id)).map(this::snapshot);} }
     public Optional<KnownPlayer> findKnownPlayer(String name) { synchronized(this){UUID id=names.get(key(name));return Optional.ofNullable(id).map(players::get);} }
+    /** Returns a server-owned display label for a known personal or organization account. */
+    public Optional<String> accountDisplayName(AccountId id) { synchronized(this){
+        State state=accounts.get(id);if(state==null)return Optional.empty();
+        if(state.type==AccountType.PERSONAL)return Optional.ofNullable(players.get(state.owner)).map(KnownPlayer::lastKnownName);
+        OrganizationId organizationId=organizationAccounts.get(id);return Optional.ofNullable(organizationId).map(organizations::get).map(organization -> organization.name);
+    } }
     public List<TransactionRecord> history(AccountId id) { synchronized(this){State state=accounts.get(id);return state==null?List.of():List.copyOf(state.history);} }
 
     public CompletionStage<TransferOutcome> transfer(TransferRequest request) { return submit(()->transferNow(request,false)); }

@@ -112,9 +112,17 @@ The ledger commits a tax invoice identity, calculated fee, balance debit, recipi
 
 ## P08 optional-client networking status
 
-P08 defines one loader-neutral version-1 wallet protocol with an 8 KiB inbound bound, negotiated capability record, bounded replay identifiers, and per-player rate limit. A strict shared wire codec rejects oversized, malformed, and trailing data before dispatch. The server derives the actor from the connection, rechecks account visibility for selection/history, and reaches the established payment preview/confirmation/cancellation service instead of mutating balance state. Forge and NeoForge install optional request/response transports; neither adapter references a physical-client type on a dedicated server. Unmodified clients remain supported through commands and receive no optional payload.
+P08 defines one loader-neutral wallet protocol (currently version 3) with an 8 KiB inbound bound, negotiated capability record, bounded replay identifiers, and per-player rate limit. A strict shared wire codec rejects oversized, malformed, and trailing data before dispatch. The server derives the actor from the connection, rechecks account visibility for selection/history, and reaches the established payment preview/confirmation/cancellation service instead of mutating balance state. Forge and NeoForge install optional request/response transports; neither adapter references a physical-client type on a dedicated server. Unmodified clients remain supported through commands and receive no optional payload.
 
-Physical-client-only login listeners negotiate then issue a bounded wallet-open request. Real Forge and NeoForge client-to-packaged-server connections have exercised the negotiated request/response path and received a wallet snapshot. `docs/NETWORK_PROTOCOL.md` records the verification evidence. No GUI or client-authoritative rule is introduced.
+Physical-client-only login listeners negotiate then issue a bounded wallet-open request. Real Forge and NeoForge client-to-packaged-server connections have exercised the negotiated request/response path and received a wallet snapshot. NeoForge exposes its registration callback and payload records publicly and uses the same protocol version for payload registration, so the client receives the server-bound payload declaration before it sends its handshake. `docs/NETWORK_PROTOCOL.md` records the verification evidence. No GUI or client-authoritative rule is introduced.
+
+## P09 optional wallet presentation
+
+The wallet presentation remains a physical-client-only view over permission-filtered `WalletResponse` data. It has no ledger, persistence, or balance-mutation path. A server-authoritative snapshot is requested on wallet open and is pushed to an online negotiated client after a durable administrative grant, deduction, freeze, or unfreeze. The HUD and wallet therefore consume only server-derived account snapshots.
+
+The client owns local presentation state: theme, HUD visibility, position, scale, opacity, and display colors. The wallet can be moved by its header and resized within content-safe bounds. Client rendering is isolated in loader-specific registration classes; dedicated-server entry points never reference wallet UI classes.
+
+Server branding uses bounded JVM configuration values: `scrip.wallet.name` and an optional `scrip.wallet.icon` resource location. Branding travels inside the negotiated wallet snapshot and is validated before use. Icons are resolved only from installed or server-provided resource packs; the protocol does not accept arbitrary uploaded files or remote asset URLs.
 
 ## Approved future architecture (not implemented)
 

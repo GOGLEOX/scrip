@@ -37,6 +37,16 @@ class WalletProtocolServiceTest {
             assertEquals("UNAUTHORIZED",service.handle(BOB,wrongActorCancel,1,1).toCompletableFuture().join().detail().orElseThrow());
             WalletRequest cancel=new WalletRequest(6,WalletProtocol.Request.CANCEL_PREVIEW,Optional.empty(),Optional.empty(),0,Optional.of(nonce),0);
             assertEquals("CANCELLED",service.handle(ALICE,cancel,1,1).toCompletableFuture().join().detail().orElseThrow());
+            WalletResponse named=service.handle(ALICE,WalletRequest.previewByName(7,alice,"Bob",2_000),1,1).toCompletableFuture().join();
+            assertEquals(WalletProtocol.Response.PREVIEW_RESULT,named.type());
+            assertTrue(named.preview().isPresent());
+            WalletResponse unknown=service.handle(ALICE,WalletRequest.previewByName(8,alice,"NotKnown",1),1,1).toCompletableFuture().join();
+            assertEquals("UNKNOWN_ACCOUNT",unknown.detail().orElseThrow());
+            WalletResponse committed=service.handle(ALICE,WalletRequest.previewByName(9,alice,"Bob",100),1,1).toCompletableFuture().join();
+            assertEquals(WalletProtocol.Response.TRANSACTION_COMMITTED,committed.type());
+            assertEquals(2_900,committed.account().orElseThrow().balance().units());
+            WalletRequest historyRequest=new WalletRequest(10,WalletProtocol.Request.REQUEST_HISTORY,Optional.of(alice),Optional.empty(),0,Optional.empty(),100);
+            assertTrue(service.handle(ALICE,historyRequest,1,1).toCompletableFuture().join().history().getFirst().description().contains("to Bob"));
         }
     }
 }

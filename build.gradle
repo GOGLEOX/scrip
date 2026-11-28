@@ -73,7 +73,9 @@ tasks.register('verifyArtifacts') {
                         def bytes = zip.getInputStream(item).bytes
                         assert ((bytes[6] & 255) << 8 | (bytes[7] & 255)) == 65
                         def constants = new String(bytes, java.nio.charset.StandardCharsets.ISO_8859_1)
-                        assert !constants.contains('net/minecraft/client/')
+                        // Client-only wallet classes are intentionally packaged for optional clients.
+                        // The server bootstrap and every non-client class must remain side-safe.
+                        if (!item.name.startsWith('com/gogleox/scrip/client/') && !item.name.contains('Client')) assert !constants.contains('net/minecraft/client/')
                         assert !constants.contains(loader == 'forge' ? 'net/neoforged/' : 'net/minecraftforge/')
                     }
                 }

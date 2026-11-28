@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.GameProfileArgument;
@@ -36,8 +37,12 @@ public final class ScripCommandRegistrar {
     private static final int ADMIN_PERMISSION = 2;
     private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
     private final Supplier<Optional<CommandService>> commands;
+    private final Consumer<ServerPlayer> walletOpener;
+    private final Consumer<ServerPlayer> walletRefresher;
 
-    public ScripCommandRegistrar(Supplier<Optional<CommandService>> commands) { this.commands = commands; }
+    public ScripCommandRegistrar(Supplier<Optional<CommandService>> commands) { this(commands, ignored -> { }, ignored -> { }); }
+    public ScripCommandRegistrar(Supplier<Optional<CommandService>> commands, Consumer<ServerPlayer> walletOpener) { this(commands,walletOpener,ignored -> { }); }
+    public ScripCommandRegistrar(Supplier<Optional<CommandService>> commands, Consumer<ServerPlayer> walletOpener, Consumer<ServerPlayer> walletRefresher) { this.commands = commands; this.walletOpener=walletOpener;this.walletRefresher=walletRefresher; }
 
     public void register(CommandDispatcher<CommandSourceStack> dispatcher, String aliasProperty) {
         registerRoot(dispatcher, "scrip");
@@ -69,9 +74,15 @@ public final class ScripCommandRegistrar {
                 .then(Commands.literal("pay").then(Commands.argument("player", GameProfileArgument.gameProfile())
                         .then(Commands.argument("amount", LongArgumentType.longArg(1)).executes(this::pay))))
                 .then(Commands.literal("confirm").then(Commands.argument("nonce", StringArgumentType.word()).executes(this::confirmPayment)))
+                .then(Commands.literal("wallet").executes(this::openWallet))
                 .then(Commands.literal("history").executes(this::history))
                 .then(integration().requires(source -> source.hasPermission(ADMIN_PERMISSION)))
                 .then(admin));
+    }
+
+    private int openWallet(CommandContext<CommandSourceStack> context) {
+        try { ServerPlayer player=context.getSource().getPlayerOrException(); walletOpener.accept(player); return success(context,"Opening wallet when the optional client feature is available. Commands remain available without it."); }
+        catch(Exception exception){return failure(context,"This command requires a player.");}
     }
 
     private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> adjustment(String name, boolean negative) {
@@ -201,14 +212,14 @@ public final class ScripCommandRegistrar {
         Optional<CommandService> service = commands.get(); if (service.isEmpty()) return failure(context, "Scrip is not ready.");
         long amount = LongArgumentType.getLong(context, "amount");
         TransferOutcome outcome = service.get().adjust(target.get().id(), negative ? -amount : amount, reason, actor(context), UUID.randomUUID());
-        if (outcome.status() == TransferOutcome.Status.SUCCESS) return success(context, (negative ? "Deducted " : "Granted ") + amount + " Coins for " + target.get().name() + ".");
+        if (outcome.status() == TransferOutcome.Status.SUCCESS) { refreshWallet(context,target.get().id()); return success(context, (negative ? "Deducted " : "Granted ") + amount + " Coins for " + target.get().name() + "."); }
         return failure(context, transferFailure(outcome));
     }
     private int control(CommandContext<CommandSourceStack> context, boolean frozen, String reason) {
         Optional<Target> target = target(context); if (target.isEmpty()) return failure(context, "Unknown player account.");
         Optional<CommandService> service = commands.get(); if (service.isEmpty()) return failure(context, "Scrip is not ready.");
         AccountControlOutcome outcome = service.get().setFrozen(target.get().id(), frozen, reason, actor(context), UUID.randomUUID());
-        if (outcome.status() == AccountControlOutcome.Status.SUCCESS) return success(context, target.get().name() + (frozen ? " is frozen." : " is unfrozen."));
+        if (outcome.status() == AccountControlOutcome.Status.SUCCESS) { refreshWallet(context,target.get().id()); return success(context, target.get().name() + (frozen ? " is frozen." : " is unfrozen.")); }
         return failure(context, outcome.status().name().toLowerCase().replace('_', ' ') + ".");
     }
     private int audit(CommandContext<CommandSourceStack> context) {
@@ -234,6 +245,10 @@ public final class ScripCommandRegistrar {
     private AuditActor actor(CommandContext<CommandSourceStack> context) {
         try { ServerPlayer player = context.getSource().getPlayerOrException(); return AuditActor.player(player.getUUID(), player.getGameProfile().getName()); }
         catch (Exception ignored) { return AuditActor.console(); }
+    }
+    private void refreshWallet(CommandContext<CommandSourceStack> context, UUID playerId) {
+        ServerPlayer player=context.getSource().getServer().getPlayerList().getPlayer(playerId);
+        if(player!=null) walletRefresher.accept(player);
     }
     private static String transferFailure(TransferOutcome outcome) { return switch (outcome.status()) {
         case INVALID_AMOUNT -> "Amount must be positive.";

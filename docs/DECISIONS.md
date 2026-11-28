@@ -23,6 +23,14 @@
 - Fee destination (burn vs treasury), organization dissolution, ownership succession and account limits.
 - FTB Quests team vs player reward, repeatable payout identity; Serilum fallback policy.
 - Whether a separately retained audit register is needed beyond player-visible 100 history entries and required claims/settlements.
+
+## P09 wallet presentation decisions | 2026-11-27
+
+- Wallet, HUD, theme, local display preferences, and window placement are presentation-only client state. They never create or mutate balances.
+- A connected optional client receives a wallet refresh only after a server-side durable commit. Administrative adjustments and lifecycle changes refresh the affected online negotiated client; unmodified clients retain command feedback only.
+- Server branding is restricted to a bounded display name and an optional resource-pack texture identifier. Do not add raw file uploads, remote downloads, client-provided branding, or arbitrary asset bytes to the wallet protocol.
+- The wallet has a content-safe minimum size rather than compressing payment fields or confirmation controls below readable bounds.
+- NeoForge optional payload registration is public and version-aligned with the shared wallet protocol. This is required for the loader to advertise the server-bound handshake payload before the client sends it; package-private registration previously produced a client login disconnect rather than a safe optional-client fallback.
 - Supported OS/filesystem and filesystem atomic-rename fallback; backup schedule/retention.
 - Explicit nonzero-balance forfeiture/sweep requires separate user authorization and is not in v1.
 

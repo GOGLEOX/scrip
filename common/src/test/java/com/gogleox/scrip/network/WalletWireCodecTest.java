@@ -17,7 +17,7 @@ class WalletWireCodecTest {
         Instant now=Instant.ofEpochMilli(System.currentTimeMillis()); AccountSnapshot snapshot=new AccountSnapshot(account,owner,AccountType.PERSONAL,new Balance(3000),now,now,now,AccountLifecycle.ACTIVE);
         PaymentPreview preview=new PaymentPreview(nonce,owner,account,recipient,2000,5,2005,1,now.plusSeconds(30),true);
         TransactionRecord record=new TransactionRecord(UUID.randomUUID(),now,TransactionDirection.OUTGOING,Optional.of(recipient),2000,"payment");
-        WalletResponse response=new WalletResponse(9,WalletProtocol.Response.PREVIEW_RESULT,Optional.of(snapshot),Optional.of(preview),List.of(record),Optional.empty(),Optional.of("PENDING"));
+        WalletResponse response=new WalletResponse(9,WalletProtocol.Response.PREVIEW_RESULT,Optional.of(snapshot),Optional.of(preview),List.of(record),List.of(),Optional.empty(),Optional.of("PENDING"));
         assertEquals(response,WalletWireCodec.decodeResponse(WalletWireCodec.encodeResponse(response)));
     }
     @Test void rejectsOversizedAndTrailingWireData() {
